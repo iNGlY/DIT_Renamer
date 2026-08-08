@@ -3,956 +3,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DIT 现场卡卷重命名工具</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    
+    <title>DIT Renamer V0.4 (Pro App Edition)</title>
     <style>
         :root {
-            --bg-base: #08080a;
-            --bg-surface: #111115;
-            --bg-surface-elevated: #16161f;
-            --border-color: rgba(255, 255, 255, 0.08);
-            --border-focus: rgba(99, 102, 241, 0.5);
-            
-            --text-primary: #f3f3f5;
-            --text-secondary: #9fa0aa;
-            --text-muted: #5f606a;
-            
-            --color-primary: #6366f1; /* 智能靛蓝 */
-            --color-primary-glow: rgba(99, 102, 241, 0.25);
-            --color-success: #10b981; /* 校验成功绿 */
-            --color-success-glow: rgba(16, 185, 129, 0.2);
-            --color-warning: #f59e0b; /* 警告黄 */
-            --color-danger: #ef4444;
-            
-            --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --bg-base: #141416;
+            --bg-sidebar: #1e1e20;
+            --bg-panel: #26262a;
+            --bg-input: #18181a;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-focus: #0A84FF;
+            --text-main: #f2f2f7;
+            --text-sub: #8e8e93;
+            --accent-blue: #0A84FF;
+            --accent-green: #30D158;
+            --accent-orange: #FF9F0A;
+            --accent-red: #FF453A;
+            --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+            --font-mono: "SF Mono", Menlo, monospace;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background-color: var(--bg-base);
-            color: var(--text-primary);
-            font-family: var(--font-sans);
+            font-family: var(--font-main);
+            background: var(--bg-base);
+            color: var(--text-main);
             height: 100vh;
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
             user-select: none;
+            overflow: hidden;
         }
 
-        /* 顶部状态栏 */
-        header {
+        /* 侧边栏 */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 30px;
-            background: rgba(17, 17, 21, 0.7);
-            border-bottom: 1px solid var(--border-color);
-            backdrop-filter: blur(20px);
-            height: 64px;
+            flex-direction: column;
+            padding: 16px;
             flex-shrink: 0;
-            z-index: 100;
         }
 
-        .logo-group h1 {
-            font-size: 1.3rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            background: linear-gradient(90deg, #a5b4fc, #6366f1, #a855f7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo-group p {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            margin-top: 2px;
-        }
-
-        .system-status {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-pill {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 0.8rem;
+        .app-header {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            padding-left: 4px;
         }
 
-        .pulse-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--color-success);
-            box-shadow: 0 0 8px var(--color-success);
-            animation: pulse-animation 2s infinite;
-        }
-
-        @keyframes pulse-animation {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
-        }
-
-        /* 布局网格 */
-        .workspace {
-            display: grid;
-            grid-template-columns: 340px 1fr;
-            height: calc(100vh - 64px);
-            padding: 20px 30px;
-            gap: 20px;
-            max-width: 1800px;
-            margin: 0 auto;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        .panel {
-            background-color: var(--bg-surface);
-            border: 1px solid var(--border-color);
-            border-radius: 24px;
-            padding: 20px;
+        /* 分段控制器 (Segmented Control) */
+        .segmented-control {
             display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            transition: var(--transition-smooth);
-        }
-
-        .panel:hover {
-            border-color: rgba(99, 102, 241, 0.2);
-        }
-
-        .panel-title {
-            font-size: 1rem;
-            font-weight: 600;
+            background: rgba(0,0,0,0.4);
+            padding: 2px;
+            border-radius: 7px;
+            border: 1px solid var(--border-color);
             margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 12px;
-            color: var(--text-primary);
         }
 
-        /* 侧边栏卡片列表 */
-        .card-list {
+        .segmented-item {
+            flex: 1;
+            text-align: center;
+            padding: 5px 0;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            color: var(--text-sub);
+            transition: all 0.15s ease;
+        }
+
+        .segmented-item.active {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .nav-section {
             display: flex;
             flex-direction: column;
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .nav-button {
+            display: flex;
+            align-items: center;
             gap: 10px;
-            overflow-y: auto;
-            flex: 1.5;
-            min-height: 100px;
-        }
-
-        .volume-card {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 14px;
-            cursor: pointer;
-            transition: var(--transition-smooth);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .volume-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background-color: transparent;
-            transition: var(--transition-smooth);
-        }
-
-        .volume-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        .volume-card.active {
-            border-color: var(--color-primary);
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
-        }
-
-        .volume-card.active::before {
-            background-color: var(--color-primary);
-        }
-
-        .volume-card.generic-warning {
-            border-color: rgba(245, 158, 11, 0.3);
-        }
-
-        .volume-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-        }
-
-        .volume-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .badge-warning {
-            background-color: rgba(245, 158, 11, 0.15);
-            color: var(--color-warning);
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 20px;
-            border: 1px solid rgba(245, 158, 11, 0.2);
-        }
-
-        .volume-path {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            word-break: break-all;
-        }
-
-        .volume-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-top: 4px;
-        }
-
-        /* 空间进度条 */
-        .space-progress-bg {
-            background: rgba(255, 255, 255, 0.05);
-            height: 6px;
-            border-radius: 3px;
-            overflow: hidden;
-            width: 100%;
-        }
-
-        .space-progress-fill {
-            background: linear-gradient(90deg, var(--color-primary), #818cf8);
-            height: 100%;
-            border-radius: 3px;
-        }
-
-        /* 安全推出按钮 */
-        .eject-btn {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 1rem;
-            padding: 4px 8px;
+            padding: 8px 12px;
             border-radius: 6px;
-            transition: var(--transition-smooth);
-        }
-
-        .eject-btn:hover {
-            background-color: rgba(239, 68, 68, 0.15) !important;
-            color: var(--color-danger) !important;
-        }
-
-        /* 空状态提示 */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-            text-align: center;
-            gap: 16px;
-            flex: 1;
-        }
-
-        .empty-icon {
-            font-size: 3rem;
-            animation: sonar-pulse 2s infinite;
-        }
-
-        @keyframes sonar-pulse {
-            0% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.1); opacity: 0.9; }
-            100% { transform: scale(1); opacity: 0.5; }
-        }
-
-        /* 主操作区 */
-        .main-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-
-        /* 信息卡片 */
-        .info-card {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .card-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .detail-label {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .detail-value {
-            font-size: 1.1rem;
+            font-size: 13px;
             font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        /* 建议重命名大框 */
-        .suggestion-box {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
-            border: 1px dashed var(--color-primary);
-            border-radius: 20px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-        }
-
-        .suggestion-text h3 {
-            font-size: 1.1rem;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-        }
-
-        .suggestion-text p {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        .suggestion-badge {
-            background: linear-gradient(135deg, var(--color-primary), #a855f7);
-            color: white;
-            font-size: 2.2rem;
-            font-family: var(--font-mono);
-            font-weight: 700;
-            padding: 10px 24px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
-            letter-spacing: 0.05em;
-        }
-
-        /* 手动调整面板 */
-        .manual-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .manual-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* 字母选择网格 */
-        .letter-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-            gap: 8px;
-        }
-
-        .letter-btn {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            border-radius: 8px;
-            height: 38px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.9rem;
+            color: var(--text-sub);
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: 0.15s;
         }
 
-        .letter-btn:hover {
-            color: var(--text-primary);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
+        .nav-button:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+        .nav-button.active { background: rgba(10, 132, 255, 0.15); color: var(--accent-blue); font-weight: 600; }
 
-        .letter-btn.selected {
-            background-color: var(--color-primary);
-            border-color: var(--color-primary);
-            color: white;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        /* 卷号输入框 */
-        .input-group {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .input-field {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 10px 16px;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 1.1rem;
-            font-weight: 600;
-            width: 140px;
-            text-align: center;
-            outline: none;
-            transition: var(--transition-smooth);
-        }
-
-        .input-field:focus {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
-        }
-
-        /* 预览转换效果 */
-        .preview-box {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            padding: 16px;
-            border-radius: 16px;
-            font-size: 1.05rem;
-            margin-top: 10px;
-        }
-
-        .preview-vol {
-            font-family: var(--font-mono);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 6px 14px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .preview-vol.new {
-            background: var(--color-success-glow);
-            border-color: var(--color-success);
-            color: var(--color-success);
-            font-weight: 600;
-        }
-
-        .arrow-icon {
-            color: var(--text-muted);
-            font-size: 1.2rem;
-        }
-
-        /* 重命名大按钮 */
-        .action-btn {
-            background: linear-gradient(135deg, var(--color-primary), #7c3aed);
-            border: none;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-            padding: 16px;
-            border-radius: 16px;
-            cursor: pointer;
-            transition: var(--transition-smooth);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.25);
-            margin-top: auto;
-        }
-
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(99, 102, 241, 0.4);
-            filter: brightness(1.1);
-        }
-
-        .action-btn:active {
-            transform: translateY(1px);
-        }
-
-        .action-btn:disabled {
-            background: var(--bg-surface-elevated);
-            color: var(--text-muted);
-            border: 1px solid var(--border-color);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        /* 成功动画覆盖层 */
-        .success-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(12, 12, 14, 0.95);
-            border-radius: 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-            z-index: 10;
-        }
-
-        .success-overlay.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .success-checkmark {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: var(--color-success-glow);
-            border: 2px solid var(--color-success);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.5rem;
-            color: var(--color-success);
-            animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-
-        @keyframes bounce-in {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.1); }
-            80% { transform: scale(0.9); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        /* 历史记录面板 */
-        .history-panel {
-            display: flex;
-            flex-direction: column;
-            flex: 1.2;
-            min-height: 130px;
-            overflow: hidden;
-            margin-top: 10px;
-            border-top: 1px solid var(--border-color);
-            padding-top: 10px;
-        }
-
-        .history-title {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
-            flex-shrink: 0;
-        }
-
-        .history-list-box {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            overflow-y: auto;
+        .card-list {
             flex: 1;
-        }
-
-        .history-item-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 12px;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            font-size: 0.8rem;
-            text-align: left;
-            transition: var(--transition-smooth);
+            gap: 8px;
+            min-height: 120px;
         }
 
-        .history-item-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            background: rgba(255, 255, 255, 0.04);
+        .vol-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: 0.15s;
         }
 
-        /* 隐藏及滚动条定制 */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+        .vol-card:hover { border-color: rgba(255,255,255,0.2); }
+        .vol-card.active { border-color: var(--accent-blue); background: rgba(10, 132, 255, 0.08); }
+
+        .vol-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .vol-name { font-weight: 600; font-size: 13px; }
+        .vol-badge { background: var(--accent-orange); color: black; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px; }
+        .vol-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-sub); }
+
+        /* 主工作区 */
+        .main-workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-base);
+            overflow-y: auto;
+            position: relative;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.08);
+
+        .tab-content { display: none; padding: 28px 36px; height: 100%; }
+        .tab-content.active { display: block; }
+
+        .section-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; letter-spacing: -0.3px; }
+
+        .pro-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
             border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.16);
-        }
-
-        /* 小窗口高度/宽度下的布局和字号自适应缩放与排版 */
-        @media (max-height: 730px) {
-            header {
-                height: 52px;
-                padding: 8px 24px;
-            }
-            .logo-group h1 {
-                font-size: 1.15rem;
-            }
-            .logo-group p {
-                font-size: 0.7rem;
-            }
-            .status-pill {
-                padding: 4px 10px;
-                font-size: 0.72rem;
-            }
-            .workspace {
-                height: calc(100vh - 52px);
-                padding: 10px 16px 14px 16px;
-                gap: 12px;
-                grid-template-columns: 310px 1fr;
-            }
-            .panel {
-                padding: 14px;
-                border-radius: 16px;
-            }
-            .panel-title {
-                margin-bottom: 12px;
-                padding-bottom: 8px;
-                font-size: 0.95rem;
-            }
-            .volume-card {
-                padding: 10px;
-                border-radius: 12px;
-            }
-            .volume-title {
-                font-size: 0.8rem;
-            }
-            .volume-meta {
-                font-size: 0.7rem;
-            }
-            .main-panel {
-                gap: 12px;
-            }
-            .info-card {
-                padding: 14px;
-                border-radius: 14px;
-                gap: 10px;
-            }
-            .card-row {
-                gap: 12px;
-            }
-            .detail-label {
-                font-size: 0.72rem;
-            }
-            .detail-value {
-                font-size: 0.85rem;
-            }
-            .suggestion-box {
-                padding: 12px;
-                border-radius: 12px;
-                gap: 8px;
-            }
-            .suggestion-text h3 {
-                font-size: 0.85rem;
-            }
-            .suggestion-text p {
-                font-size: 0.72rem;
-            }
-            .suggestion-badge {
-                font-size: 1.1rem;
-                padding: 6px 14px;
-            }
-            .manual-panel {
-                padding: 10px 14px;
-                border-radius: 14px;
-            }
-            .letter-grid {
-                grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
-                gap: 4px;
-            }
-            .letter-btn {
-                height: 28px;
-                font-size: 0.78rem;
-                border-radius: 6px;
-            }
-            .input-field {
-                padding: 8px 12px;
-                font-size: 0.85rem;
-                border-radius: 10px;
-            }
-            .preview-box {
-                padding: 10px;
-                border-radius: 12px;
-                font-size: 0.8rem;
-            }
-            .preview-vol {
-                font-size: 0.9rem;
-                padding: 4px 10px;
-            }
-            .action-btn {
-                padding: 12px;
-                font-size: 0.9rem;
-                border-radius: 12px;
-            }
-            .printer-settings-panel {
-                font-size: 0.75rem;
-                gap: 5px;
-                margin-top: 8px;
-                padding-top: 8px;
-            }
-            .printer-settings-panel select {
-                padding: 4px 8px !important;
-                font-size: 0.7rem !important;
-            }
-            .printer-settings-panel button {
-                padding: 4px 8px !important;
-                font-size: 0.68rem !important;
-            }
-            .history-panel {
-                margin-top: 8px;
-                padding-top: 8px;
-            }
-            .history-title {
-                font-size: 0.72rem;
-                margin-bottom: 6px;
-            }
-            .history-item-card {
-                padding: 8px;
-                border-radius: 8px;
-                gap: 4px;
-                font-size: 0.75rem;
-            }
+            padding: 20px;
+            margin-bottom: 20px;
         }
 
-        @media (max-width: 1000px) {
-            .workspace {
-                grid-template-columns: 290px 1fr;
-                gap: 12px;
-                padding: 12px 16px;
-            }
-            .letter-grid {
-                grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
-            }
+        .pro-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; }
+        .pro-row:last-child { border-bottom: none; }
+        .pro-label { color: var(--text-sub); }
+        .pro-val { font-weight: 500; }
+
+        .pro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label { font-size: 11px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; }
+
+        .pro-input {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: white;
+            padding: 8px 10px;
+            font-family: var(--font-mono);
+            font-size: 13px;
         }
+        .pro-input:focus { outline: none; border-color: var(--accent-blue); }
+
+        .letter-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+        .letter-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 5px;
+            padding: 6px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .letter-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); }
+
+        .preview-bar {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 20px 0;
+            font-family: var(--font-mono);
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-primary:hover { background: #0071e3; }
+
+        /* 已忽略与设置列表 */
+        .exclusion-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .exclusion-item {
+            background: var(--bg-input);
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+
+        .btn-danger {
+            background: rgba(255, 69, 58, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(255, 69, 58, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .btn-danger:hover { background: rgba(255, 69, 58, 0.3); }
+
+        .overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(20,20,22,0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.2s; z-index: 100;
+        }
+        .overlay.show { opacity: 1; pointer-events: auto; }
+
     </style>
 </head>
 <body>
 
-    <!-- 顶部状态栏 -->
-    <header>
-        <div class="logo-group">
-            <h1>📂 DIT 现场卡卷重命名工具</h1>
-            <p>自动检测并安全重命名外接 CFA / SD 存储卡，为 Silverstack 消除卷名冲突</p>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="app-header">
+            <span>🎬 DIT Renamer Pro</span>
         </div>
-        <div class="system-status">
-            <div class="status-pill">
-                <span class="pulse-dot"></span>
-                <span>本地集成客户端运行中</span>
+
+        <!-- HIG 分段控制器 (Auto-Rename Switch) -->
+        <div class="segmented-control">
+            <div class="segmented-item active" id="seg-manual" onclick="setRenameMode(false)">手动处理</div>
+            <div class="segmented-item" id="seg-auto" onclick="setRenameMode(true)">⚡️ 自动重命名</div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-button active" id="nav-cards" onclick="switchTab('cards')">
+                💽 就绪的卡卷
+            </div>
+            <div class="nav-button" id="nav-settings" onclick="switchTab('settings')">
+                ⚙️ 偏好设置
             </div>
         </div>
-    </header>
 
-    <!-- 工作区 -->
-    <div class="workspace">
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-sub); text-transform: uppercase; margin-bottom: 8px;">设备列表</div>
+        <div class="card-list" id="volume-list">
+            <!-- 卡片列表 -->
+        </div>
+
+        <!-- 折叠的已忽略列表 -->
+        <div id="ignored-section" style="margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-sub); cursor: pointer;" onclick="toggleIgnoredCollapse()">
+                <span>🙈 已忽略设备 (<span id="ignored-count">0</span>)</span>
+                <span id="ignored-arrow">▶</span>
+            </div>
+            <div id="ignored-list-container" style="display: none; flex-direction: column; gap: 4px; margin-top: 6px;"></div>
+        </div>
+    </div>
+
+    <!-- 主视图区域 -->
+    <div class="main-workspace">
         
-        <!-- 左侧：卡片列表 -->
-        <div class="panel">
-            <div class="panel-title">
-                <span>外接卡盘列表</span>
-                <button id="toggle-poll-btn" onclick="togglePolling()" style="background:var(--color-primary); color:white; border:none; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight: 500; cursor:pointer; transition: var(--transition-smooth);">🟢 自动监测: 开启</button>
-            </div>
-            
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); margin-bottom: 8px;">
-                <span style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 1.1rem; color: var(--color-warning);">⚡</span>
-                    插入符合规则的相机存储卡时全自动重命名
-                </span>
-                <label class="switch" style="position: relative; display: inline-block; width: 34px; height: 20px;">
-                    <input type="checkbox" id="auto-rename-checkbox" onchange="toggleAutoRename()" style="opacity: 0; width: 0; height: 0;">
-                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 20px;">
-                        <span style="position: absolute; content: ''; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%;"></span>
-                    </span>
-                </label>
-            </div>
-            
-            <style>
-                #auto-rename-checkbox:checked + span { background-color: var(--color-primary); }
-                #auto-rename-checkbox:checked + span span { transform: translateX(14px); }
-            </style>
-            
-            <div class="card-list" id="volume-list">
-                <!-- 动态载入挂载卷列表 -->
-            </div>
-            
-            <!-- 已忽略设备折叠区 -->
-            <div id="ignored-section" style="margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px; display: none;">
-                <div onclick="toggleIgnoredCollapse()" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--text-muted); font-size: 0.8rem; font-weight: 500; user-select: none;">
-                    <span>🙈 已忽略的设备 (<span id="ignored-count">0</span>)</span>
-                    <span id="ignored-arrow">▶</span>
-                </div>
-                <div id="ignored-list-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 120px; overflow-y: auto; padding-right: 4px;">
-                    <!-- 动态载入已忽略的设备 -->
-                </div>
-            </div>
-            
-            <!-- 历史记录 -->
-            <div class="history-panel">
-                <div class="history-title">最近重命名历史</div>
-                <div class="history-list-box" id="history-list">
-                    <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 12px 0;">
-                        暂无重命名记录
-                    </div>
-                </div>
-            </div>
-
+        <!-- 成功弹窗 -->
+        <div class="overlay" id="success-overlay">
+            <div style="font-size: 48px; margin-bottom: 12px;">✅</div>
+            <h2 style="font-size: 18px; margin-bottom: 6px;">重命名成功</h2>
+            <p style="color: var(--text-sub); font-size: 13px;" id="success-msg">已顺利完成操作</p>
+            <button onclick="closeSuccessOverlay()" style="margin-top: 20px; background: var(--bg-panel); border:1px solid var(--border-color); color:white; padding: 8px 20px; border-radius: 6px; cursor: pointer;">继续</button>
         </div>
 
-        <!-- 右侧：操作中心 -->
-        <div class="panel" style="position: relative;" id="action-center">
-            
-            <!-- 成功提示覆盖层 -->
-            <div class="success-overlay" id="success-overlay">
-                <div class="success-checkmark">✓</div>
-                <h2 style="font-size: 1.4rem; font-weight: 600;">卷名修改成功！</h2>
-                <p style="color: var(--text-secondary);" id="success-msg">已重命名为 A001 并自动重新挂载</p>
-                <button class="action-btn" style="margin-top: 10px; padding: 8px 24px; font-size: 0.95rem; box-shadow: none;" onclick="closeSuccessOverlay()">确定</button>
+        <!-- 选项卡 1：卡卷重命名 -->
+        <div class="tab-content active" id="tab-cards">
+            <div class="section-title">卡卷重命名与分析</div>
+
+            <div id="empty-state" style="text-align: center; padding: 80px 0; color: var(--text-sub);">
+                <div style="font-size: 40px; margin-bottom: 12px;">🎛</div>
+                <div style="font-size: 14px;">请在左侧侧边栏选择一张存储卡</div>
             </div>
 
-            <!-- 空状态 -->
-            <div class="empty-state" id="empty-state">
-                <span class="empty-icon">🔌</span>
-                <h3>未选择卡片</h3>
-                <p>请在左侧列表中选择需要重命名的卷名（如 UNTITLED 或 DJI），系统将自动扫描其内部素材并给出重命名建议。</p>
-            </div>
+            <div id="main-panel" style="display: none;">
+                <div class="pro-panel">
+                    <div class="pro-row">
+                        <span class="pro-label">当前盘符名称</span>
+                        <span class="pro-val" id="val-name">UNTITLED</span>
+                    </div>
+                    <div class="pro-row">
+                        <span class="pro-label">挂载路径</span>
+                        <span class="pro-val" id="val-path" style="font-family: var(--font-mono);">/Volumes/UNTITLED</span>
+                    </div>
+                    <div class="pro-row">
+                        <span class="pro-label">可用容量</span>
+                        <span class="pro-val" id="val-space">128 GB / 256 GB</span>
+                    </div>
+                </div>
 
-            <!-- 核心操作面板 -->
-            <div class="main-panel" id="main-panel" style="display: none;">
+                <div class="pro-panel" style="background: rgba(10, 132, 255, 0.05); border-color: rgba(10, 132, 255, 0.2);">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--accent-blue); margin-bottom: 4px;" id="suggestion-title">AI 素材结构推演</div>
+                    <div style="font-size: 13px; color: var(--text-main);" id="suggestion-desc">根据素材文件提取推荐命名</div>
+                    <div style="font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--accent-blue); margin-top: 8px;" id="suggestion-badge">A001</div>
+                </div>
+
+                <div class="pro-panel">
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; margin-bottom: 12px;">参数手动微调</div>
+                    <div class="pro-grid">
+                        <div class="input-group">
+                            <label>机位标识 (Camera ID)</label>
+                            <div class="letter-grid" id="letter-grid"></div>
+                        </div>
+                        <div class="input-group">
+                            <label>卷号 (Roll Number)</label>
+                            <input type="text" class="pro-input" id="roll-input" value="001" maxlength="3" oninput="updatePreviewFromManual()">
+                            
+                            <label style="margin-top: 8px;">卡片复用次数</label>
+                            <input type="number" class="pro-input" id="reuse-input" value="0" min="0" oninput="updatePreviewFromManual()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-bar">
+                    <span style="color: var(--text-sub)" id="preview-old">UNTITLED</span>
+                    <span style="color: var(--text-sub)">➔</span>
+                    <span style="color: var(--accent-green); font-size: 18px; font-weight: 700;" id="preview-new">A001</span>
+                </div>
+
+                <button class="btn-primary" onclick="startRename()">执行标准重命名</button>
+            </div>
+        </div>
+
+        <!-- 选项卡 2：偏好设置与排除列表 -->
+        <div class="tab-content" id="tab-settings">
+            <div class="section-title">偏好设置 & 排除规则</div>
+
+            <div class="pro-panel">
+                <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">🚫 自动排除卷名 (黑名单)</div>
+                <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px;">以下卷名的设备插入时将自动忽略，不触发重命名逻辑：</div>
                 
-                <div class="panel-title" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
-                    <span>卡片分析与重命名设置</span>
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" class="pro-input" id="new-ignore-input" placeholder="输入要排除的卷名 (例如: BackupDisk)" style="flex: 1;">
+                    <button onclick="addCustomIgnore()" style="background: var(--accent-blue); border:none; color:white; padding: 0 16px; border-radius: 6px; font-size: 12px; font-weight:600; cursor:pointer;">添加规则</button>
                 </div>
 
-                <!-- 卷详情卡片 -->
-                <div class="info-card">
-                    <div class="card-row">
-                        <div class="detail-item">
-                            <span class="detail-label">当前盘符名称</span>
-                            <span class="detail-value" id="val-name">UNTITLED</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">挂载路径</span>
-                            <span class="detail-value" id="val-path" style="font-family: var(--font-mono); font-size: 0.85rem;">/Volumes/UNTITLED</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">存储容量</span>
-                            <span class="detail-value" id="val-space">128 GB 可用 / 256 GB 总共</span>
-                        </div>
-                    </div>
-                    <div class="space-progress-bg">
-                        <div class="space-progress-fill" id="val-space-bar" style="width: 50%;"></div>
-                    </div>
+                <div class="exclusion-list" id="custom-exclusion-list">
+                    <!-- 排除规则列表 -->
                 </div>
-
-                <!-- 自动分析建议 -->
-                <div class="suggestion-box" id="suggestion-box">
-                    <div class="suggestion-text">
-                        <h3 id="suggestion-title">正在自动分析卡内素材...</h3>
-                        <p id="suggestion-desc">读取第一段素材文件名并提取机位卷号</p>
-                    </div>
-                    <div class="suggestion-badge" id="suggestion-badge">A001</div>
-                </div>
-
-                <!-- 手动选择/覆盖 -->
-                <div class="manual-panel">
-                    <div class="manual-title">
-                        <span>手动调整参数 (若自动识别不符，可在此修改)</span>
-                    </div>
-
-                    <div class="detail-label">选择机位号 (A - Z)</div>
-                    <div class="letter-grid" id="letter-grid">
-                        <!-- 字母 A-Z 按钮 -->
-                    </div>
-
-                    <div style="display: flex; gap: 20px; align-items: center; margin-top: 10px; width: 100%;">
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                            <div class="detail-label">输入卷号 (三位数字)</div>
-                            <input type="text" class="input-field" id="roll-input" value="001" maxlength="3" oninput="updatePreviewFromManual()" style="width: 100%;">
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-                            <div class="detail-label">卡片复用次数 (自检/自定义)</div>
-                            <input type="number" class="input-field" id="reuse-input" value="0" min="0" style="width: 100%;">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 效果预览 -->
-                <div class="preview-box">
-                    <span>卷名转换效果:</span>
-                    <span class="preview-vol" id="preview-old">UNTITLED</span>
-                    <span class="arrow-icon">➜</span>
-                    <span class="preview-vol new" id="preview-new">A001</span>
-                </div>
-
-                <!-- 提交按钮 -->
-                <button class="action-btn" id="rename-btn" onclick="startRename()">
-                    <span>⚡ 一键安全重命名并重新挂载</span>
-                </button>
-
             </div>
 
+            <div class="pro-panel">
+                <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">🧹 历史记录与缓存</div>
+                <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px;">清空本地重命名历史与临时挂载规则：</div>
+                <button class="btn-danger" onclick="clearHistory()">清空重命名历史记录</button>
+            </div>
         </div>
 
     </div>
@@ -964,480 +397,180 @@
         let scanResult = null;
         let isPollingActive = true;
         let ignoredVolumes = JSON.parse(localStorage.getItem('ignoredVolumes') || '[]');
+        let customIgnores = JSON.parse(localStorage.getItem('customIgnores') || '["MACINTOSH HD", "TIME MACHINE"]');
         let autoRenameEnabled = JSON.parse(localStorage.getItem('autoRenameEnabled') || 'false');
-        let isFirstFetch = true;
-        let previousVolumePaths = [];
         let isIgnoredCollapsed = true;
 
-        // 初始化字母网格
-        const letterGrid = document.getElementById('letter-grid');
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-        alphabet.forEach(char => {
-            const btn = document.createElement('button');
-            btn.className = "letter-btn";
-            btn.innerText = char;
-            btn.onclick = () => selectLetter(char);
-            letterGrid.appendChild(btn);
+        // 初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            initLetters();
+            updateModeUI();
+            renderExclusionList();
+            setInterval(fetchVolumes, 2500);
+            fetchVolumes();
         });
 
-        function selectLetter(char) {
-            document.querySelectorAll('.letter-btn').forEach(btn => {
-                btn.classList.toggle('selected', btn.innerText === char);
+        function initLetters() {
+            const letterGrid = document.getElementById('letter-grid');
+            letterGrid.innerHTML = "";
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(char => {
+                const btn = document.createElement('div');
+                btn.className = "letter-btn" + (char === 'A' ? " active" : "");
+                btn.innerText = char;
+                btn.onclick = () => selectLetter(char, btn);
+                letterGrid.appendChild(btn);
             });
+        }
+
+        function selectLetter(char, el) {
+            document.querySelectorAll('.letter-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
             updatePreviewFromManual();
         }
 
-        // 自动检测的起停开关
-        function togglePolling() {
-            isPollingActive = !isPollingActive;
-            const btn = document.getElementById('toggle-poll-btn');
-            if (isPollingActive) {
-                btn.innerText = "🟢 自动检测: 开启";
-                btn.style.backgroundColor = "var(--color-primary)";
-                fetchVolumes();
-            } else {
-                btn.innerText = "🔴 自动检测: 暂停";
-                btn.style.backgroundColor = "var(--text-muted)";
-                document.getElementById('volume-list').innerHTML = `
-                    <div class="empty-state" style="padding: 30px 10px;">
-                        <span class="empty-icon" style="font-size: 2rem;">⏸️</span>
-                        <p style="font-size: 0.85rem;">自动检测已暂停</p>
-                        <p style="font-size: 0.75rem; color: var(--text-muted);">您可以随时点击上方按钮恢复检测</p>
-                    </div>
-                `;
-            }
-        }
-
-        // 定时轮询挂载卷
-        function startVolumePolling() {
-            fetchVolumes();
-            loadHistory();
-            setInterval(fetchVolumes, 3000);
-        }
-
-        async function fetchVolumes() {
-            if (!isPollingActive) return;
-            try {
-                // 调用集成客户端接口
-                const data = await window.pywebview.api.get_volumes();
-                
-                const currentPaths = data.map(v => v.path);
-                let newPaths = [];
-                if (isFirstFetch) {
-                    isFirstFetch = false;
-                } else {
-                    newPaths = currentPaths.filter(p => !previousVolumePaths.includes(p));
-                }
-                previousVolumePaths = currentPaths;
-
-                volumesList = data;
-                renderVolumeList();
-                
-                // 检查并自动重命名符合要求的新卡
-                if (autoRenameEnabled && newPaths.length > 0) {
-                    for (const path of newPaths) {
-                        const vol = volumesList.find(v => v.path === path);
-                        // 要求是非Generic（相机器材），且未被忽略
-                        if (vol && vol.brand !== 'Generic' && !ignoredVolumes.includes(vol.name)) {
-                            console.log("检测到符合规则的新卡片插入，尝试自动处理: ", vol.name);
-                            await autoProcessVolume(vol);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error("无法获取挂载卷列表:", err);
-            }
-        }
-
-        async function autoProcessVolume(vol) {
-            // 触发选择并扫描
-            await selectVolume(vol.path);
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
             
-            // 如果扫描成功（找到了合法的拍摄历史和编号推断），直接触发重命名并挂载
-            if (scanResult && scanResult.detected) {
-                console.log("扫描推断成功，全自动执行重命名流程", vol.name);
-                await startRename();
-            } else {
-                console.log("扫描结果未完全匹配 DIT 重命名规则，交由人工确认处理");
-            }
+            document.getElementById('tab-' + tabName).classList.add('active');
+            document.getElementById('nav-' + tabName).classList.add('active');
         }
 
-        function toggleAutoRename() {
-            autoRenameEnabled = document.getElementById('auto-rename-checkbox').checked;
+        function setRenameMode(isAuto) {
+            autoRenameEnabled = isAuto;
             localStorage.setItem('autoRenameEnabled', JSON.stringify(autoRenameEnabled));
+            updateModeUI();
         }
 
-        function renderVolumeList() {
-            const container = document.getElementById('volume-list');
-            if (!isPollingActive) return;
-
-            // 自动检测并过滤非 SONY/DJI 存储卡 (归类到忽略列表中)
-            let ignoredChanged = false;
-            volumesList.forEach(vol => {
-                if (vol.brand === 'Generic' && !ignoredVolumes.includes(vol.name)) {
-                    ignoredVolumes.push(vol.name);
-                    ignoredChanged = true;
-                }
-            });
-            if (ignoredChanged) {
-                localStorage.setItem('ignoredVolumes', JSON.stringify(ignoredVolumes));
-            }
-
-            // 分流：活跃的设备 VS 已被忽略的设备
-            const activeVols = [];
-            const hiddenVols = [];
-
-            volumesList.forEach(vol => {
-                if (ignoredVolumes.includes(vol.name)) {
-                    hiddenVols.push(vol);
-                } else {
-                    activeVols.push(vol);
-                }
-            });
-
-            // 渲染活跃列表
-            if (activeVols.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state" style="padding: 30px 10px;">
-                        <span class="empty-icon" style="font-size: 2rem;">⏳</span>
-                        <p style="font-size: 0.85rem;">等待卡片插入...</p>
-                        <p style="font-size: 0.75rem; color: var(--text-muted);">支持 UNTITLED、DJI 等卷名自动识别</p>
-                    </div>
-                `;
-            } else {
-                let html = "";
-                activeVols.forEach(vol => {
-                    const isGeneric = vol.is_generic;
-                    const badge = isGeneric ? `<span class="badge-warning">建议重命名</span>` : '';
-                    const activeClass = selectedVolume && selectedVolume.path === vol.path ? 'active' : '';
-                    const warningClass = isGeneric ? 'generic-warning' : '';
-                    
-                    const percent = ((vol.total - vol.free) / vol.total * 100).toFixed(0);
-                    const freeGB = (vol.free / (1024**3)).toFixed(1);
-                    const totalGB = (vol.total / (1024**3)).toFixed(0);
-
-                    // 注入安全推出按钮 ⏏️ 与 忽略按钮 🚫
-                    const ejectButton = `<button class="eject-btn" onclick="event.stopPropagation(); ejectVolume('${vol.path}')" title="安全推出卡片并让读卡器休眠">⏏️</button>`;
-                    const ignoreButton = `<button class="ignore-btn" onclick="event.stopPropagation(); ignoreVolume('${vol.name}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; padding: 4px; border-radius: 4px; transition: var(--transition-smooth);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" onmouseout="this.style.backgroundColor='transparent'" title="忽略并隐藏此设备">🚫</button>`;
-
-                    html += `
-                        <div class="volume-card ${activeClass} ${warningClass}" onclick="selectVolume('${vol.path}')">
-                            <div class="volume-header" style="display: flex; justify-content: space-between; align-items: center;">
-                                <span class="volume-title" style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px;">📁 ${vol.name} ${badge}</span>
-                                <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                                    ${ignoreButton}
-                                    ${ejectButton}
-                                </div>
-                            </div>
-                            <div class="volume-path">${vol.path}</div>
-                            <div class="space-progress-bg">
-                                <div class="space-progress-fill" style="width: ${percent}%;"></div>
-                            </div>
-                            <div class="volume-meta">
-                                <span>可用: ${freeGB} GB / ${totalGB} GB</span>
-                                <span>已用 ${percent}%</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                container.innerHTML = html;
-            }
-
-            // 渲染忽略折叠区
-            const ignoredSection = document.getElementById('ignored-section');
-            const ignoredCount = document.getElementById('ignored-count');
-            const ignoredContainer = document.getElementById('ignored-list-container');
-
-            if (hiddenVols.length > 0) {
-                ignoredSection.style.display = 'block';
-                ignoredCount.innerText = hiddenVols.length;
-                
-                let ignoredHtml = "";
-                hiddenVols.forEach(vol => {
-                    ignoredHtml += `
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; font-size: 0.75rem;">
-                            <span style="color: var(--text-secondary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;" title="${vol.path}">📁 ${vol.name}</span>
-                            <button onclick="restoreVolume('${vol.name}')" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; transition: var(--transition-smooth);" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.05)'" onmouseout="this.style.backgroundColor='transparent'">恢复显示</button>
-                        </div>
-                    `;
-                });
-                ignoredContainer.innerHTML = ignoredHtml;
-            } else {
-                ignoredSection.style.display = 'none';
-            }
+        function updateModeUI() {
+            document.getElementById('seg-manual').classList.toggle('active', !autoRenameEnabled);
+            document.getElementById('seg-auto').classList.toggle('active', autoRenameEnabled);
         }
 
-        // 忽略某个设备
-        async function ignoreVolume(name) {
-            if (!ignoredVolumes.includes(name)) {
-                ignoredVolumes.push(name);
-                localStorage.setItem('ignoredVolumes', JSON.stringify(ignoredVolumes));
-                
-                // 如果当前选中的是被忽略的盘，清空右侧选择
-                if (selectedVolume && selectedVolume.name === name) {
-                    selectedVolume = null;
-                    document.getElementById('main-panel').style.display = 'none';
-                    document.getElementById('empty-state').style.display = 'flex';
-                }
-                renderVolumeList();
-            }
-        }
-
-        // 恢复显示某个设备
-        async function restoreVolume(name) {
-            ignoredVolumes = ignoredVolumes.filter(v => v !== name);
-            localStorage.setItem('ignoredVolumes', JSON.stringify(ignoredVolumes));
-            renderVolumeList();
-        }
-
-        // 切换忽略折叠区
         function toggleIgnoredCollapse() {
             isIgnoredCollapsed = !isIgnoredCollapsed;
             const container = document.getElementById('ignored-list-container');
             const arrow = document.getElementById('ignored-arrow');
-            if (isIgnoredCollapsed) {
-                container.style.display = 'none';
-                arrow.innerText = '▶';
-            } else {
-                container.style.display = 'flex';
-                arrow.innerText = '▼';
+            container.style.display = isIgnoredCollapsed ? 'none' : 'flex';
+            arrow.innerText = isIgnoredCollapsed ? '▶' : '▼';
+        }
+
+        function renderExclusionList() {
+            const list = document.getElementById('custom-exclusion-list');
+            list.innerHTML = "";
+            customIgnores.forEach((name, idx) => {
+                const item = document.createElement('div');
+                item.className = "exclusion-item";
+                item.innerHTML = `<span>${name}</span><button class="btn-danger" onclick="removeIgnore(${idx})">移除</button>`;
+                list.appendChild(item);
+            });
+        }
+
+        function addCustomIgnore() {
+            const input = document.getElementById('new-ignore-input');
+            const val = input.value.trim().toUpperCase();
+            if (val && !customIgnores.includes(val)) {
+                customIgnores.push(val);
+                localStorage.setItem('customIgnores', JSON.stringify(customIgnores));
+                renderExclusionList();
+                input.value = "";
             }
         }
 
-        // 选择要处理的卷
-        async function selectVolume(path) {
-            const vol = volumesList.find(v => v.path === path);
-            if (!vol) return;
+        function removeIgnore(idx) {
+            customIgnores.splice(idx, 1);
+            localStorage.setItem('customIgnores', JSON.stringify(customIgnores));
+            renderExclusionList();
+        }
+
+        function fetchVolumes() {
+            if (!window.pywebview) return;
+            window.pywebview.api.get_mounted_volumes().then(res => {
+                volumesList = res;
+                renderVolumeList();
+            });
+        }
+
+        function renderVolumeList() {
+            const container = document.getElementById('volume-list');
+            container.innerHTML = "";
             
-            // 如果是非 SONY/DJI 存储卡，进行警告确认
-            if (vol.brand === 'Generic') {
-                const proceed = confirm("⚠️ 警告：检测到该存储媒介【并非 SONY 或 DJI 相机卡】！\n\n它可能是一个外接备份硬盘或无关移动硬盘。误重命名备份盘会导致数据损坏。您确定要操作此设备吗？");
-                if (!proceed) return;
-            }
-            
+            volumesList.forEach(vol => {
+                const isGeneric = pywebview.api.GENERIC_NAMES ? pywebview.api.GENERIC_NAMES.includes(vol.name.toLowerCase()) : false;
+                const card = document.createElement('div');
+                card.className = "vol-card" + (selectedVolume && selectedVolume.path === vol.path ? " active" : "");
+                card.onclick = () => selectVolume(vol);
+                
+                card.innerHTML = `
+                    <div class="vol-top">
+                        <span class="vol-name">${vol.name}</span>
+                        ${isGeneric ? '<span class="vol-badge">通配卡</span>' : ''}
+                    </div>
+                    <div class="vol-sub">${vol.path}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function selectVolume(vol) {
             selectedVolume = vol;
             renderVolumeList();
-
-            // 显示右侧操作面板
             document.getElementById('empty-state').style.display = 'none';
-            document.getElementById('main-panel').style.display = 'flex';
-
-            // 更新基本信息
+            document.getElementById('main-panel').style.display = 'block';
+            
             document.getElementById('val-name').innerText = vol.name;
             document.getElementById('val-path').innerText = vol.path;
-            
-            const freeGB = (vol.free / (1024**3)).toFixed(1);
-            const totalGB = (vol.total / (1024**3)).toFixed(0);
-            document.getElementById('val-space').innerText = `${freeGB} GB 可用 / ${totalGB} GB 总共`;
-            
-            const percent = ((vol.total - vol.free) / vol.total * 100).toFixed(0);
-            document.getElementById('val-space-bar').style.width = `${percent}%`;
-
+            document.getElementById('val-space').innerText = `${(vol.free / 1024**3).toFixed(1)} GB 可用 / ${(vol.total / 1024**3).toFixed(1)} GB`;
             document.getElementById('preview-old').innerText = vol.name;
-
-            // 触发内部素材扫描
-            document.getElementById('suggestion-badge').style.display = 'none';
-            document.getElementById('suggestion-title').innerText = "正在扫描素材文件...";
-            document.getElementById('suggestion-desc').innerText = "读取视频元数据并寻找命名规律...";
             
-            try {
-                // 调用集成客户端接口
-                const result = await window.pywebview.api.scan_volume(path);
-                scanResult = result;
-                
-                if (result.detected) {
-                    autoCamera = result.camera_letter;
-                    autoRoll = result.roll_number;
-                    
-                    document.getElementById('suggestion-badge').style.display = 'block';
-                    document.getElementById('suggestion-badge').innerText = result.suggested_name;
-                    document.getElementById('suggestion-title').innerText = "智能分析推荐";
-                    document.getElementById('suggestion-desc').innerText = result.explanation;
-                    
-                    // 自动填充手动控制
-                    selectLetter(autoCamera);
-                    document.getElementById('roll-input').value = autoRoll;
-                } else {
-                    document.getElementById('suggestion-badge').style.display = 'none';
-                    document.getElementById('suggestion-title').innerText = "需要手动指定参数";
-                    document.getElementById('suggestion-desc').innerText = result.explanation;
-                    
-                    // 默认重置手动控制
-                    selectLetter("A");
-                    document.getElementById('roll-input').value = "001";
+            window.pywebview.api.scan_volume_media(vol.path).then(res => {
+                scanResult = res;
+                if (res.suggested_name) {
+                    document.getElementById('suggestion-badge').innerText = res.suggested_name;
+                    document.getElementById('preview-new').innerText = res.suggested_name;
                 }
-                document.getElementById('reuse-input').value = result.reuse_count || 0;
-                updatePreviewFromManual();
-            } catch (err) {
-                console.error("扫描素材错误:", err);
-                document.getElementById('suggestion-title').innerText = "自动分析出错";
-                document.getElementById('suggestion-desc').innerText = "无法与后台服务通信。请手动设置卷名。";
-            }
+            });
         }
 
-        // 手动调整更新预览
         function updatePreviewFromManual() {
-            const selectedBtn = document.querySelector('.letter-btn.selected');
-            const camera = selectedBtn ? selectedBtn.innerText : "A";
+            if (!selectedVolume) return;
+            const activeBtn = document.querySelector('.letter-btn.active');
+            const letter = activeBtn ? activeBtn.innerText : 'A';
+            const roll = document.getElementById('roll-input').value || "001";
+            const reuse = parseInt(document.getElementById('reuse-input').value || "0");
             
-            let roll = document.getElementById('roll-input').value.trim();
-            // 补齐 3 位数字，如 1 -> 001
-            if (roll.length > 0 && !isNaN(roll)) {
-                roll = roll.padStart(3, '0');
-            }
+            let suffix = (scanResult && scanResult.suffix) ? scanResult.suffix : "";
+            let newName = `${letter}${roll}`;
+            if (reuse > 0) newName += `-${reuse}`;
+            if (suffix) newName += suffix;
             
-            const newName = `${camera}${roll}`.toUpperCase();
             document.getElementById('preview-new').innerText = newName;
         }
 
-        // 开始重命名
-        async function startRename() {
+        function startRename() {
             if (!selectedVolume) return;
-            
-            // 非 SONY/DJI 存储卡的终极确认
-            if (selectedVolume.brand === 'Generic') {
-                const doubleCheck = confirm("⚠️ 终极安全确认：该盘符【并非 SONY 或 DJI 相机卡】！\n\n重命名操作会导致备份硬盘的路径发生改变，造成 DIT 工作流灾难。\n\n您确定要对非相机卡设备强制执行重命名操作吗？");
-                if (!doubleCheck) return;
-            }
-            
-            const selectedBtn = document.querySelector('.letter-btn.selected');
-            const camera = selectedBtn ? selectedBtn.innerText : "A";
-            let roll = document.getElementById('roll-input').value.trim();
-            if (roll.length > 0 && !isNaN(roll)) {
-                roll = roll.padStart(3, '0');
-            }
-            const newName = `${camera}${roll}`.toUpperCase();
-            
-            const renameBtn = document.getElementById('rename-btn');
-            renameBtn.disabled = true;
-            renameBtn.innerText = "⏳ 正在卸载并执行重命名...";
-
-            try {
-                const reuseCount = parseInt(document.getElementById('reuse-input').value) || 0;
-                const result = await window.pywebview.api.rename_volume({
-                    path: selectedVolume.path,
-                    old_name: selectedVolume.name,
-                    new_name: newName,
-                    camera_letter: camera,
-                    roll_number: roll,
-                    device_type: scanResult ? scanResult.device_type : "Generic",
-                    first_clip_name: scanResult ? scanResult.first_clip_name : "",
-                    first_clip_time: scanResult ? scanResult.first_clip_time : 0.0,
-                    last_clip_name: scanResult ? scanResult.last_clip_name : "",
-                    last_clip_time: scanResult ? scanResult.last_clip_time : 0.0,
-                    clip_count: scanResult ? scanResult.clip_count : 0,
-                    used_size: selectedVolume.total - selectedVolume.free,
-                    reuse_count: reuseCount
-                });
-                
-                if (result.success) {
-                    // 显示成功覆盖层
-                    document.getElementById('success-msg').innerText = `卡卷已被重命名为 [${newName}] 并自动重新挂载！`;
+            const newName = document.getElementById('preview-new').innerText;
+            window.pywebview.api.rename_volume(selectedVolume.path, newName).then(res => {
+                if (res.success) {
+                    document.getElementById('success-msg').innerText = `已成功更名为 ${newName}`;
                     document.getElementById('success-overlay').classList.add('show');
-                    
-                    // 重新载入历史记录
-                    loadHistory();
-                    
-                    // 重置右侧操作区
-                    selectedVolume = null;
                 } else {
-                    alert(`重命名失败: ${result.message}`);
+                    alert(res.message);
                 }
-            } catch (err) {
-                alert(`请求出错: ${err.message}`);
-            } finally {
-                renameBtn.disabled = false;
-                renameBtn.innerText = "⚡ 一键安全重命名并重新挂载";
-            }
-        }
-
-        // 安全推出读卡器卡卷 ⏏️
-        async function ejectVolume(path) {
-            if (!confirm(`确定要安全推出该卡片吗？\n${path}\n\n推出后，读卡器芯片将进入休眠状态，此时物理拔出读卡器将绝对安全，不会干扰其他正在进行的拷贝工作。`)) {
-                return;
-            }
-            try {
-                const result = await window.pywebview.api.eject_volume(path);
-                if (result.success) {
-                    alert(`推出成功！\n卡卷已安全注销，读卡器已进入休眠模式。现在可以安全地拔掉卡片/读卡器。`);
-                    fetchVolumes();
-                    if (selectedVolume && selectedVolume.path === path) {
-                        closeSuccessOverlay();
-                    }
-                } else {
-                    alert(`推出失败: ${result.message}\n请确保没有其他程序（如访达或播放器）正在占用此卡内文件。`);
-                }
-            } catch (err) {
-                alert(`推出出错: ${err.message}`);
-            }
+            });
         }
 
         function closeSuccessOverlay() {
             document.getElementById('success-overlay').classList.remove('show');
-            document.getElementById('main-panel').style.display = 'none';
-            document.getElementById('empty-state').style.display = 'flex';
             fetchVolumes();
         }
 
-        function formatBytes(bytes) {
-            if (bytes === 0 || isNaN(bytes)) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // 重新载入历史记录列表
-        async function loadHistory() {
-            const historyList = document.getElementById('history-list');
-            try {
-                // 调用集成客户端接口
-                const history = await window.pywebview.api.get_history();
-                
-                if (history.length === 0) {
-                    historyList.innerHTML = `
-                        <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 12px 0;">
-                            暂无重命名记录
-                        </div>
-                    `;
-                    return;
-                }
-
-                let html = "";
-                history.forEach(item => {
-                    const time = new Date(item.timestamp * 1000).toLocaleTimeString();
-                    const sizeStr = formatBytes(item.used_size);
-                    const firstClip = item.first_clip_name || "无";
-                    const lastClip = item.last_clip_name || "无";
-                    
-                    html += `
-                        <div class="history-item-card">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: 600; color: var(--text-primary);">📁 ${item.old_name} ➜ <span style="color: var(--color-success); font-weight:700;">${item.new_name}</span></span>
-                                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.75rem;">${time}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; color: var(--text-secondary); font-size: 0.75rem;">
-                                <span>📊 素材数: <b>${item.clip_count}</b> 个</span>
-                                <span>💾 已使用: <b>${sizeStr}</b></span>
-                            </div>
-                            <div style="border-top: 1px dashed var(--border-color); margin-top: 4px; padding-top: 4px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.7rem; display: flex; flex-direction: column; gap: 2px;">
-                                <div style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${firstClip}">首: ${firstClip}</div>
-                                <div style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${lastClip}">末: ${lastClip}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                historyList.innerHTML = html;
-            } catch (err) {
-                console.error("加载历史记录失败:", err);
+        function clearHistory() {
+            if (confirm("确定要清空所有重命名历史记录吗？")) {
+                localStorage.removeItem('renameHistory');
+                alert("历史记录已清空");
             }
         }
-
-        // 等待 PyWebView 集成框架初始化完成后启动
-        window.addEventListener('pywebviewready', function() {
-            document.getElementById('auto-rename-checkbox').checked = autoRenameEnabled;
-            startVolumePolling();
-        });
     </script>
 </body>
 </html>

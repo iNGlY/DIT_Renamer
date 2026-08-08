@@ -9,7 +9,7 @@ BUILD_DIR="$PROJECT_ROOT/build"
 DOWNLOADS_DIR="$HOME/Downloads"
 
 echo "=================================================="
-echo "🎬 开始构建 DIT Renamer V0.1 (macOS 独立应用程序)"
+echo "🎬 开始构建 DIT Renamer V0.4 (macOS Pro App 独立版)"
 echo "=================================================="
 
 cd "$PROJECT_ROOT"
@@ -17,10 +17,19 @@ cd "$PROJECT_ROOT"
 # 清理历史构建产物
 rm -rf "$DIST_DIR" "$BUILD_DIR" "*.spec"
 
-echo "📦 正在使用 PyInstaller 打包 .app ..."
+# 查找有效的 PyInstaller 路径
+if [ -f "$PROJECT_ROOT/.venv/bin/pyinstaller" ]; then
+    PYINSTALLER="$PROJECT_ROOT/.venv/bin/pyinstaller"
+elif [ -f "$PROJECT_ROOT/../dit_volume_renamer/.venv/bin/pyinstaller" ]; then
+    PYINSTALLER="$PROJECT_ROOT/../dit_volume_renamer/.venv/bin/pyinstaller"
+else
+    PYINSTALLER="pyinstaller"
+fi
+
+echo "📦 正在使用 PyInstaller ($PYINSTALLER) 打包 .app ..."
 # 使用 PyInstaller 编译，捆绑 web/index.html 及 docs 手册数据文件
-pyinstaller --noconfirm \
-    --name "dit_renamer_V0.1" \
+"$PYINSTALLER" --noconfirm \
+    --name "dit_renamer_V0.4" \
     --windowed \
     --add-data "src/web/index.html:web" \
     --add-data "docs:docs" \
@@ -28,12 +37,12 @@ pyinstaller --noconfirm \
     "src/app.py"
 
 echo "📑 正在导出并压缩至系统下载文件夹 (~/Downloads) ..."
-cp -r "$DIST_DIR/dit_renamer_V0.1.app" "$DOWNLOADS_DIR/"
+cp -r "$DIST_DIR/dit_renamer_V0.4.app" "$DOWNLOADS_DIR/"
 cd "$DIST_DIR"
-rm -f "$DOWNLOADS_DIR/dit_renamer_V0.1.zip"
-zip -r -q "$DOWNLOADS_DIR/dit_renamer_V0.1.zip" "dit_renamer_V0.1.app"
+rm -f "$DOWNLOADS_DIR/dit_renamer_V0.4.zip"
+zip -r -q "$DOWNLOADS_DIR/dit_renamer_V0.4.zip" "dit_renamer_V0.4.app"
 
 echo "✅ 构建完工！已无缝同步至您的下载文件夹："
-echo "   👉 App 应用程序: $DOWNLOADS_DIR/dit_renamer_V0.1.app"
-echo "   👉 Zip 压缩包:   $DOWNLOADS_DIR/dit_renamer_V0.1.zip"
+echo "   👉 App 应用程序: $DOWNLOADS_DIR/dit_renamer_V0.4.app"
+echo "   👉 Zip 压缩包:   $DOWNLOADS_DIR/dit_renamer_V0.4.zip"
 echo "=================================================="

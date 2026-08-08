@@ -7,12 +7,14 @@ import subprocess
 import sys
 import time
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+
 
 # 全局变量以控制窗口和主线程
 main_window = None
 
 class Api:
+    GENERIC_NAMES = {"untitled", "dji", "no name", "eos_digital", "sony", "sony_card", "canon", "nikon", "sd", "cfx", "cfexpress", "prossd", "dji_prossd", "snd", "audio", "record", "nocname"}
+
     def get_history_path(self):
         if getattr(sys, 'frozen', False):
             exe_dir = os.path.dirname(sys.executable)
@@ -94,6 +96,45 @@ class Api:
                 count += 1
         return count
 
+    # ================= Sony FX 系列多格式 Clip 身份解析器 =================
+    def _parse_clip_identity(self, first_clip_name, device_type):
+        """
+        多策略解析 clip 文件名以提取机位号(camera_letter)与卷号(roll_number)。
+        返回 (camera_letter, roll_number, parse_method) 三元组。
+
+        Sony FX 系列机身文件命名格式速查：
+          - Standard:        C0001.MP4             (C = Clip 固定前缀，非机位号)
+          - Date + Title:    20260725_C0532.MP4    (日期 + Clip 编号)
+          - Title + Date:    MyProject_230101001.MP4
+          - Cam ID + Reel#:  A001C001_230101AB.MP4 (唯一包含真实机位与卷号的格式)
+        """
+        name = os.path.splitext(first_clip_name)[0]  # 去除扩展名
+
+        # 策略 1: Sony Cam ID + Reel# 专业格式 (兼容 DJI 4 位 Clip 号与变体后缀)
+        # 格式: A001C0001_230101AB (Sony) 或 D001C0001_700101_F03008 (DJI)
+        m = re.match(r'^([A-Z])(\d{3})C\d{3,4}_\d{6}_?[A-Z0-9]{2,6}', name)
+        if m:
+            return m.group(1), m.group(2), "sony_cam_reel"
+
+        # 策略 2: Sony Standard/Date 格式检测
+        # 剥离可能的日期前缀 (YYYYMMDD_ 或 YYMMDD_)
+        stripped = re.sub(r'^\d{6,8}_', '', name)
+        # 如果剥离后以 C + 4位数字开头，这是 Sony 的 Clip 编号，不是机位号
+        if re.match(r'^C\d{4}', stripped) and device_type == "Sony":
+            return "", "", "sony_standard_clip"
+
+        # 策略 3: 通用规则（非 Sony 或 Sony 使用了自定义 Title 格式）
+        m = re.match(r'^([A-Za-z])_?(\d{3})', name)
+        if m:
+            letter = m.group(1).upper()
+            # 额外安全检查：即使设备类型未知，C + 4位数字的组合
+            # 在 Sony 体系中始终是 Clip 编号，需要谨慎处理
+            if letter == 'C' and re.match(r'^C\d{4}', stripped):
+                return "", "", "ambiguous_c_prefix"
+            return letter, m.group(2), "generic"
+
+        return "", "", "unrecognized"
+
     # ================= 卷监控与重命名逻辑 =================
     def detect_card_brand(self, volume_path):
         if not volume_path or not os.path.exists(volume_path):
@@ -103,14 +144,13 @@ class Api:
         name_lower = name.lower()
         
         # 1. 检查是否为相机默认盘符或已重命名的 DIT 卷名格式 (如 A001)
-        generic_names = {"untitled", "dji", "no name", "eos_digital", "sony", "sony_card", "canon", "nikon", "sd", "cfx", "cfexpress"}
         dit_pattern = re.match(r'^[A-Z][0-9]{3}$', name)
         
         is_suspected_card = False
         if dit_pattern:
             is_suspected_card = True
         else:
-            for g_name in generic_names:
+            for g_name in self.GENERIC_NAMES:
                 if g_name in name_lower:
                     is_suspected_card = True
                     break
@@ -151,6 +191,9 @@ class Api:
                     return "DJI"
                 if item_lower.startswith("sony") or "msdcf" in item_lower:
                     return "Sony"
+                # 检查 DJI 4D / Inspire 3 的根目录特征 (例如 D001_F03008)
+                if os.path.isdir(os.path.join(volume_path, item)) and re.match(r'^[A-Z]\d{3}_[A-Z0-9]{6}$', item):
+                    return "DJI"
             
             # 扫描 DCIM 目录
             dcim_path = os.path.join(volume_path, "DCIM")
@@ -179,14 +222,13 @@ class Api:
                 
                 # 预先判断是否为疑似相机卡，如果是备份盘，直接绕过 statvfs/shutil.disk_usage 以免激活磁盘
                 name_lower = name.lower()
-                generic_names = {"untitled", "dji", "no name", "eos_digital", "sony", "sony_card", "canon", "nikon", "sd", "cfx", "cfexpress"}
                 dit_pattern = re.match(r'^[A-Z][0-9]{3}$', name)
                 
                 is_suspected_card = False
                 if dit_pattern:
                     is_suspected_card = True
                 else:
-                    for g_name in generic_names:
+                    for g_name in self.GENERIC_NAMES:
                         if g_name in name_lower:
                             is_suspected_card = True
                             break
@@ -200,8 +242,7 @@ class Api:
                         total, used, free = 0, 0, 0
                         brand = "Generic"
                         
-                    generic_names_check = ["untitled", "dji", "no name", "snd", "audio", "record", "eos_digital", "nocname"]
-                    is_generic = name.lower() in generic_names_check or name.lower().startswith("untitled")
+                    is_generic = name_lower in self.GENERIC_NAMES or name_lower.startswith("untitled")
                     
                     volumes.append({
                         "name": name,
@@ -276,23 +317,41 @@ class Api:
             first_clip_time = 0.0
             last_clip_time = 0.0
 
-        device_type = "Generic"
-        if os.path.exists(os.path.join(volume_path, "PRIVATE", "M4ROOT")) or os.path.exists(os.path.join(volume_path, "M4ROOT")):
-            device_type = "Sony"
-        elif any("dji" in f[0].lower() for f in clip_paths) or "dji" in os.path.basename(volume_path).lower():
-            device_type = "DJI"
+        device_type = self.detect_card_brand(volume_path)
 
-        camera_letter = ""
-        roll_number = ""
-        match = re.match(r'^([A-Za-z])_?([0-9]{3})', first_clip_name)
-        if match:
-            camera_letter = match.group(1).upper()
-            roll_number = match.group(2)
+        camera_letter, roll_number, parse_method = self._parse_clip_identity(first_clip_name, device_type)
 
         suggested_name = f"{camera_letter}{roll_number}" if (camera_letter and roll_number) else ""
+        
+        dji_folder_name = ""
+        suffix = ""
+        if device_type == "DJI":
+            try:
+                for item in os.listdir(volume_path):
+                    if os.path.isdir(os.path.join(volume_path, item)) and re.match(r'^[A-Z]\d{3}_[A-Z0-9]{6}$', item):
+                        dji_folder_name = item
+                        break
+            except:
+                pass
+                
+        if dji_folder_name:
+            suggested_name = dji_folder_name
+            camera_letter = dji_folder_name[0]
+            roll_number = dji_folder_name[1:4]
+            suffix = dji_folder_name[4:]
+            parse_method = "dji_folder"
+
         explanation = ""
 
-        if suggested_name:
+        if parse_method == "dji_folder":
+            explanation = f"扫描根目录发现 DJI Cinema 专业结构文件夹 {dji_folder_name}，已将其直接作为完美推荐卷名。"
+        elif parse_method == "sony_cam_reel":
+            explanation = f"读取素材文件名 {first_clip_name} 自动分析成功！检测到 Sony/DJI 专业格式，机位 [{camera_letter}] 卷号 [{roll_number}]。"
+        elif parse_method == "sony_standard_clip":
+            explanation = f"检测到 Sony 标准命名格式 (Clip: {first_clip_name})。Sony 的 C 前缀代表 Clip 序号而非机位号，请手动指定机位与卷号，或在机身中设置 [Cam ID + Reel#] 格式以实现全自动推断。"
+        elif parse_method == "ambiguous_c_prefix":
+            explanation = f"发现文件 {first_clip_name} 以 C 开头且符合 Sony Clip 编号特征，为安全起见不自动推断机位号，请手动确认机位与卷号。"
+        elif suggested_name:
             explanation = f"读取素材文件名 {first_clip_name} 自动分析成功！检测到为机位 [{camera_letter}] 卷号 [{roll_number}]。"
         else:
             history = self.load_history()
@@ -341,6 +400,7 @@ class Api:
             "sample_filename": first_clip_name,
             "camera_letter": camera_letter,
             "roll_number": roll_number,
+            "suffix": suffix,
             "suggested_name": suggested_name,
             "device_type": device_type,
             "explanation": explanation,
@@ -361,7 +421,7 @@ class Api:
         if not path.startswith("/Volumes/"):
             return {"success": False, "message": "非法路径"}
         
-        new_name = re.sub(r'[^A-Za-z0-9]', '', new_name).upper()
+        new_name = re.sub(r'[^A-Za-z0-9_]', '', new_name).upper()
         if not new_name:
             return {"success": False, "message": "卷名非法"}
 
@@ -414,89 +474,13 @@ class Api:
             error_msg = result.stderr.strip() or "未知错误"
             return {"success": False, "message": f"推出失败: {error_msg}"}
 
-# ================= 开启本地 Webhook 接口监听 Silverstack =================
-class WebhookHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
 
-    def do_POST(self):
-        if self.path == "/api/silverstack_webhook":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            try:
-                data = json.loads(post_data.decode('utf-8'))
-                
-                # 1. 解析卡卷号与机位
-                roll_name = data.get("roll_name", "UNKNOWN").upper()
-                camera_letter = roll_name[0] if len(roll_name) > 0 and roll_name[0].isalpha() else "A"
-                roll_number = roll_name[1:] if len(roll_name) > 1 and roll_name[1:].isdigit() else "000"
-                
-                # 2. 尝试从传入的路径或已重命名的盘符中匹配硬件序列号
-                api = Api()
-                volume_path = data.get("volume_path", f"/Volumes/{roll_name}")
-                serial_number = api.get_volume_serial(volume_path)
-                
-                # 计算自检复用次数
-                reuse_count = api.calculate_reuse_count(serial_number)
-                
-                # 3. 录入历史
-                history = api.load_history()
-                timestamp = time.time()
-                
-                entry = {
-                    "timestamp": timestamp,
-                    "old_name": "Silverstack Ingest",
-                    "new_name": roll_name,
-                    "camera_letter": camera_letter,
-                    "roll_number": roll_number,
-                    "device_type": "Silverstack",
-                    "first_clip_name": data.get("first_clip", ""),
-                    "first_clip_time": timestamp,
-                    "last_clip_name": data.get("last_clip", ""),
-                    "last_clip_time": timestamp,
-                    "clip_count": data.get("clip_count", 0),
-                    "used_size": data.get("used_size", 0),
-                    "serial_number": serial_number,
-                    "reuse_count": reuse_count
-                }
-                history.append(entry)
-                api.save_history(history)
-                
-                # 4. 通知前端 UI 刷新历史
-                global main_window
-                if main_window:
-                    main_window.evaluate_js("loadHistory()")
-                    
-                # 5. 打印功能已移除，仅发送成功响应
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"success":true}')
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(f'{{"error":"{str(e)}"}}'.encode('utf-8'))
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-def start_webhook_server():
-    try:
-        server_address = ('127.0.0.1', 8088)
-        httpd = HTTPServer(server_address, WebhookHandler)
-        t = threading.Thread(target=httpd.serve_forever, daemon=True)
-        t.start()
-        print("Webhook server bound to http://127.0.0.1:8088")
-    except Exception as e:
-        print(f"无法启动 Webhook 监听服务器: {e}")
 
 def main():
     global main_window
     api = Api()
     
-    start_webhook_server()
+
     
     if getattr(sys, 'frozen', False):
         dir_path = sys._MEIPASS
@@ -506,7 +490,7 @@ def main():
         html_path = os.path.join(dir_path, "web", "index.html")
 
     main_window = webview.create_window(
-        title="DIT Renamer 现场卡卷重命名与自动化助手 (V0.1 开源专业版)",
+        title="DIT Renamer 现场卡卷重命名助手 (V0.4 Apple Pro App 版)",
         url=html_path,
         js_api=api,
         width=1100,

@@ -24,3 +24,8 @@ ENV/
 env/
 .DS_Store
 *.spec
+# Local virtual-environment symlink used by Antigravity.
+.venv
+# Generated Swift builds and packaged release artifacts.
+/build_swift/
+/Release/
