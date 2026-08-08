@@ -4,8 +4,8 @@
 
 - Owner: Codex
 - Branch: `main`
-- Status: Collaboration structure established; baseline commit pending
-- Last commit: `8e22edb` before the current working changes
+- Status: Collaboration structure established; baseline committed
+- Last commit: `f8d26d4` (`collab-baseline-20260808`)
 
 ## Working agreement
 
@@ -18,6 +18,5 @@
 
 ## Next handoff
 
-After the baseline commit, update this file with the new commit hash, active
-task, validation results, and whether merging into `main` is permitted.
-
+Next agent should create a task branch from `main`, update this file with the
+active task, validation results, and whether merging into `main` is permitted.

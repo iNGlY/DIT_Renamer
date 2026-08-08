@@ -16,10 +16,9 @@ and handoff context.
 ```
 
 ### 2026-08-08 — [codex] Establish collaboration contract
-- Commit: pending
+- Commit: `f8d26d4`
 - Branch: `main`
 - Changed: `AGENTS.md`, `.agents/CHANGELOG.md`, `.agents/HANDOFF.md`, `.gitignore`
-- Validation: pending
+- Validation: `python3 -m py_compile src/app.py`; working tree clean after commit
 - Follow-up/risk: Existing application work was present before this entry and
   is being preserved in the baseline commit.
-
