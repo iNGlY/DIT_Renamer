@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RenameMenuBarView: View {
     @ObservedObject var coordinator: RenameApprovalCoordinator
+    @ObservedObject var monitor: VolumeMonitor
     @ObservedObject var langManager = LanguageManager.shared
     let openMainWindow: () -> Void
 
@@ -89,6 +90,12 @@ struct RenameMenuBarView: View {
         }
         .padding(14)
         .frame(width: 390)
+        .onAppear {
+            coordinator.refresh(volumes: monitor.volumes)
+        }
+        .onChange(of: monitor.volumes) { _, newVolumes in
+            coordinator.refresh(volumes: newVolumes)
+        }
         .confirmationDialog(
             langManager.text("确认批量批准？", "Approve all selected cards?"),
             isPresented: $showBatchConfirmation,

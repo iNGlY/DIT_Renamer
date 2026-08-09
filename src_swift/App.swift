@@ -119,6 +119,7 @@ struct DITRenamerApp: App {
         MenuBarExtra {
             RenameMenuBarView(
                 coordinator: approvalCoordinator,
+                monitor: volumeMonitor,
                 openMainWindow: {
                     openMainWindow()
                 }
