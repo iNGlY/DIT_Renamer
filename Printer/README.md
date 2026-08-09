@@ -15,6 +15,8 @@ open "build/DIT Printer.app"
 
 The built app contains `DITPrinterBridge` and `ParaShootEraseBridge` helpers.
 Install the bundle in `/Applications` before enabling a Silverstack post-step.
+Always use `Printer/build/`; any root-level `build_printer/` directory is a legacy
+ignored artifact from before this project was isolated.
 
 ## Layout
 

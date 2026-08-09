@@ -8,6 +8,9 @@ This directory is a self-contained macOS DIT Printer project. Work only inside
 - Do not move Printer files back into the parent project or add Printer sources to
   a DIT Renamer target. The standalone build entry point is
   `Printer/scripts/build_printer.sh`.
+- A legacy ignored `../build_printer/` directory may exist from the pre-isolation
+  build. It is not source, is not part of this project, and must not be used for
+  validation. Use `Printer/build/` only.
 - Do not edit `../src/`, `../src_swift/`, `../src/web/`, or any DIT Renamer
   build, release, or settings files.
 - DIT Renamer is an external, read-only audit provider. Its JSON snapshot can
