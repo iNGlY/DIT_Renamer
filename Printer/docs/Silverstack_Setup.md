@@ -45,7 +45,7 @@ A repeated `job_id` updates the existing job instead of creating another pending
 
 DIT Printer renders variable text into a monochrome bitmap and writes it to the selected printer language, so Chinese Bin names and filenames do not depend on fonts installed in the printer. Built-in stock sizes are 72 x 51, 60 x 40, 50 x 30, and 80 x 50 mm. Custom templates are saved for the current macOS user. Physical calibration is still required for each printer and stock combination.
 
-The profile editor also supports a generic CUPS PDF queue and a custom CLI. The CLI receives the generated PDF through a `{file}` argument. Templates can control the title, footer, note, and printed fields. Print history can be exported as CSV or JSON; these exports record the Printer workflow and do not replace Silverstack reports.
+The profile editor also supports a generic CUPS PDF queue and a custom CLI. The CLI can receive a generated PDF or a selected TSPL/ZPL/EPL/CPCL command file through a `{file}` argument. Templates can control the title, footer, note, and printed fields. Print history can be exported as CSV or JSON; these exports record the Printer workflow and do not replace Silverstack reports.
 
 ## Label data
 

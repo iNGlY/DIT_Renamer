@@ -5,6 +5,9 @@ This directory is a self-contained macOS DIT Printer project. Work only inside
 
 ## Hard boundaries
 
+- Do not move Printer files back into the parent project or add Printer sources to
+  a DIT Renamer target. The standalone build entry point is
+  `Printer/scripts/build_printer.sh`.
 - Do not edit `../src/`, `../src_swift/`, `../src/web/`, or any DIT Renamer
   build, release, or settings files.
 - DIT Renamer is an external, read-only audit provider. Its JSON snapshot can
@@ -31,6 +34,25 @@ supporting Printer-only stores. Preserve the persisted `DITPrinterJob`,
 `LabelTemplate`, and `PrintProfile` fields unless a migration is added. The app
 must keep signal source/received time visible, require card reuse count before
 submission, and retain template/profile/history persistence.
+
+Allowed frontend areas:
+
+- `src/DITPrinterApp.swift`
+- `src/LabelTemplateStore.swift`
+- `src/PrintProfileStore.swift`
+- `src/PrintHistoryExporter.swift`
+- Printer-only preview and presentation code
+
+Conditional areas requiring explicit feature reasoning and focused tests:
+
+- `src/CUPSPrinter.swift` and command renderers
+- `src/DITPrinterBridge.swift` and manifest schema
+- `src/Silverstack/*.lua`
+
+Forbidden during ordinary frontend work:
+
+- `src/ParaShootEraseBridge.swift`
+- any parent-project source, UI, build, release, or settings file
 
 ## Validation
 
