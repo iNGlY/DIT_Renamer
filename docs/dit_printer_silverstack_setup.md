@@ -37,13 +37,13 @@ A repeated `job_id` updates the existing job instead of creating another pending
 
 ## GP-M325F setup
 
-1. Set the printer to TSPL label mode using its settings or self-test page.
+1. Set the printer to the command language used by the selected profile. TSPL is used by GP-M325F; ZPL, EPL/EPL2, and CPCL are also available for compatible printers.
 2. Add a macOS CUPS queue that passes raw data to the printer. Use a stable name such as `GP-M325F`.
 3. Select that queue in DIT Printer and refresh the queue list.
 4. Choose a stock preset or save a template with the correct width, height, and gap.
 5. Calibrate and print at least 20 labels on each stock before field use.
 
-DIT Printer renders variable text into a TSPL `BITMAP`, so Chinese Bin names and filenames do not depend on fonts installed in the printer. Built-in stock sizes are 72 x 51, 60 x 40, 50 x 30, and 80 x 50 mm. Custom templates are saved for the current macOS user. Physical calibration is still required for each printer and stock combination.
+DIT Printer renders variable text into a monochrome bitmap and writes it to the selected printer language, so Chinese Bin names and filenames do not depend on fonts installed in the printer. Built-in stock sizes are 72 x 51, 60 x 40, 50 x 30, and 80 x 50 mm. Custom templates are saved for the current macOS user. Physical calibration is still required for each printer and stock combination.
 
 The profile editor also supports a generic CUPS PDF queue and a custom CLI. The CLI receives the generated PDF through a `{file}` argument. Templates can control the title, footer, note, and printed fields. Print history can be exported as CSV or JSON; these exports record the Printer workflow and do not replace Silverstack reports.
 

@@ -41,8 +41,12 @@ enum CUPSPrinter {
         switch profile.outputKind {
         case .cupsRawTSPL:
             guard !profile.queueName.isEmpty else { throw CUPSPrinterError.noQueue }
-            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).tspl")
-            try TSPLLabelRenderer.render(job: job, template: template).write(to: fileURL, options: .atomic)
+            guard profile.printerLanguage.isRawCommand else {
+                throw CUPSPrinterError.invalidCustomProfile("CUPS Raw output requires TSPL, ZPL, EPL or CPCL.")
+            }
+            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).\(profile.printerLanguage.fileExtension)")
+            try PrinterCommandRenderer.render(job: job, template: template, language: profile.printerLanguage)
+                .write(to: fileURL, options: .atomic)
             return try run(executable: "/usr/bin/lp", arguments: ["-d", profile.queueName, "-o", "raw", fileURL.path])
         case .cupsPDF:
             guard !profile.queueName.isEmpty else { throw CUPSPrinterError.noQueue }
@@ -57,8 +61,11 @@ enum CUPSPrinter {
             guard profile.arguments.contains("{file}") else {
                 throw CUPSPrinterError.invalidCustomProfile("Custom CLI arguments must contain {file}.")
             }
-            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).pdf")
-            try TSPLLabelRenderer.pdfData(job: job, template: template).write(to: fileURL, options: .atomic)
+            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).\(profile.printerLanguage.fileExtension)")
+            let data = profile.printerLanguage == .pdf
+                ? try TSPLLabelRenderer.pdfData(job: job, template: template)
+                : try PrinterCommandRenderer.render(job: job, template: template, language: profile.printerLanguage)
+            try data.write(to: fileURL, options: .atomic)
             let arguments = profile.arguments.map { $0 == "{file}" ? fileURL.path : $0 }
             return try run(executable: profile.executablePath, arguments: arguments)
         }
@@ -143,6 +150,13 @@ enum TSPLLabelRenderer {
         image.addRepresentation(representation)
         return LabelPDFView(image: image, frame: NSRect(origin: .zero, size: size))
             .dataWithPDF(inside: NSRect(origin: .zero, size: size))
+    }
+
+    static func monochromeBitmap(job: DITPrinterJob, template: LabelTemplate = .defaultTemplate) throws -> Data {
+        guard let representation = bitmapRepresentation(job: job, template: template) else {
+            throw CUPSPrinterError.renderFailed
+        }
+        return rasterize(representation: representation, template: template)
     }
 
     private static func bitmapRepresentation(job: DITPrinterJob, template: LabelTemplate) -> NSBitmapImageRep? {
@@ -251,5 +265,51 @@ enum TSPLLabelRenderer {
         case .sourceVolume: return job.sourceVolumePath ?? "(not supplied)"
         case .customNote: return template.customNote
         }
+    }
+}
+
+enum PrinterCommandRenderer {
+    static func render(
+        job: DITPrinterJob,
+        template: LabelTemplate,
+        language: PrinterCommandLanguage
+    ) throws -> Data {
+        switch language {
+        case .tspl:
+            return try TSPLLabelRenderer.render(job: job, template: template)
+        case .zpl:
+            return try zpl(job: job, template: template)
+        case .epl:
+            return try epl(job: job, template: template)
+        case .cpcl:
+            return try cpcl(job: job, template: template)
+        case .pdf:
+            throw CUPSPrinterError.invalidCustomProfile("PDF is not a raw printer language.")
+        }
+    }
+
+    private static func zpl(job: DITPrinterJob, template: LabelTemplate) throws -> Data {
+        let bitmap = try TSPLLabelRenderer.monochromeBitmap(job: job, template: template)
+        let hex = hexadecimal(bitmap)
+        let totalBytes = bitmap.count
+        let command = "^XA^PW\(template.widthDots)^LL\(template.heightDots)^LH0,0^FO0,0^GFA,\(totalBytes),\(totalBytes),\(template.bytesPerRow),\(hex)^FS^XZ\r\n"
+        return Data(command.utf8)
+    }
+
+    private static func epl(job: DITPrinterJob, template: LabelTemplate) throws -> Data {
+        let bitmap = try TSPLLabelRenderer.monochromeBitmap(job: job, template: template)
+        let gapDots = max(0, Int((template.gapMm / 25.4 * 203).rounded()))
+        let command = "N\r\nq\(template.widthDots)\r\nQ\(template.heightDots),\(gapDots)\r\nGW0,0,\(template.bytesPerRow),\(template.heightDots),\(hexadecimal(bitmap))\r\nP1\r\n"
+        return Data(command.utf8)
+    }
+
+    private static func cpcl(job: DITPrinterJob, template: LabelTemplate) throws -> Data {
+        let bitmap = try TSPLLabelRenderer.monochromeBitmap(job: job, template: template)
+        let command = "! 0 200 200 \(template.heightDots) 1\r\nPW \(template.widthDots)\r\nCG \(template.bytesPerRow) \(template.heightDots) 0 0 \(hexadecimal(bitmap))\r\nFORM\r\nPRINT\r\n"
+        return Data(command.utf8)
+    }
+
+    private static func hexadecimal(_ data: Data) -> String {
+        data.map { String(format: "%02X", $0) }.joined()
     }
 }

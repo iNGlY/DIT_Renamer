@@ -301,6 +301,7 @@ private struct JobEditor: View {
                     }
                 }
                 LabeledContent("Output", value: profileStore.selectedProfile.outputKind.title)
+                LabeledContent("Printer language", value: profileStore.selectedProfile.printerLanguage.title)
                 if profileStore.selectedProfile.outputKind != .customCLI {
                     LabeledContent("CUPS queue", value: profileStore.selectedProfile.queueName.isEmpty ? "Not configured" : profileStore.selectedProfile.queueName)
                 }
@@ -489,6 +490,7 @@ private struct PrintProfileLibrary: View {
     let refreshQueues: () -> Void
     @State private var name = ""
     @State private var outputKind: PrintOutputKind = .cupsPDF
+    @State private var printerLanguage: PrinterCommandLanguage = .pdf
     @State private var queueName = ""
     @State private var executablePath = ""
     @State private var argumentsText = ""
@@ -506,6 +508,11 @@ private struct PrintProfileLibrary: View {
                 Picker("Driver", selection: $outputKind) {
                     ForEach(PrintOutputKind.allCases) { kind in Text(kind.title).tag(kind) }
                 }
+                Picker("Printer language", selection: $printerLanguage) {
+                    ForEach(availableLanguages) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
                 if outputKind != .customCLI {
                     Picker("CUPS queue", selection: $queueName) {
                         Text("Select queue").tag("")
@@ -517,7 +524,7 @@ private struct PrintProfileLibrary: View {
                     TextEditor(text: $argumentsText)
                         .font(.system(.body, design: .monospaced))
                         .frame(height: 80)
-                    Text("One argument per line. Include {file} on one line; DIT Printer replaces it with the rendered PDF path.")
+                    Text("One argument per line. Include {file} on one line; DIT Printer replaces it with the rendered PDF or command file path.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -528,6 +535,7 @@ private struct PrintProfileLibrary: View {
                     validationError = store.save(
                         name: name,
                         outputKind: outputKind,
+                        printerLanguage: printerLanguage,
                         queueName: queueName,
                         executablePath: executablePath,
                         argumentsText: argumentsText
@@ -550,6 +558,10 @@ private struct PrintProfileLibrary: View {
         .frame(width: 500, height: 520)
         .onAppear(perform: loadProfile)
         .onChange(of: store.selectedProfileID) { _, _ in loadProfile() }
+        .onChange(of: outputKind) { _, newKind in
+            if newKind == .cupsPDF { printerLanguage = .pdf }
+            else if printerLanguage == .pdf { printerLanguage = .tspl }
+        }
         .toolbar {
             Button { dismiss() } label: { Image(systemName: "xmark") }
                 .help("Close")
@@ -560,10 +572,19 @@ private struct PrintProfileLibrary: View {
         let profile = store.selectedProfile
         name = profile.name
         outputKind = profile.outputKind
+        printerLanguage = profile.printerLanguage
         queueName = profile.queueName
         executablePath = profile.executablePath
         argumentsText = profile.arguments.joined(separator: "\n")
         validationError = nil
+    }
+
+    private var availableLanguages: [PrinterCommandLanguage] {
+        switch outputKind {
+        case .cupsPDF: return [.pdf]
+        case .cupsRawTSPL: return [.tspl, .zpl, .epl, .cpcl]
+        case .customCLI: return PrinterCommandLanguage.allCases
+        }
     }
 }
 

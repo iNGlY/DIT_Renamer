@@ -28,7 +28,18 @@ enum LabelRendererSmokeTest {
             guard String(data: pdf.prefix(4), encoding: .ascii) == "%PDF" else {
                 fatalError("PDF label rendering did not produce a PDF document")
             }
-            print("Label renderer smoke test passed: TSPL=\(label.count), custom=\(compactLabel.count), PDF=\(pdf.count) bytes")
+            let expectedHeaders: [(PrinterCommandLanguage, String)] = [
+                (.zpl, "^XA^PW576^LL408"),
+                (.epl, "N\r\nq576\r\nQ408,24"),
+                (.cpcl, "! 0 200 200 408 1\r\nPW 576\r\nCG 72 408 0 0 ")
+            ]
+            for (language, expectedHeader) in expectedHeaders {
+                let command = try PrinterCommandRenderer.render(job: job, template: .defaultTemplate, language: language)
+                guard String(data: command.prefix(expectedHeader.utf8.count), encoding: .ascii) == expectedHeader else {
+                    fatalError("Unexpected \(language.rawValue.uppercased()) command header")
+                }
+            }
+            print("Label renderer smoke test passed: TSPL=\(label.count), custom=\(compactLabel.count), PDF=\(pdf.count) bytes, ZPL/EPL/CPCL headers valid")
         } catch {
             fatalError("TSPL label smoke test failed: \(error.localizedDescription)")
         }
