@@ -92,3 +92,10 @@ and handoff context.
 - Changed: `src_swift/RenamerEngine.swift`, `src_swift/App.swift`, `src_swift/Views/MainDetailView.swift`, `src_swift/Models/PrinterAuditExport.swift`, `src_swift/Models/RenameHistoryStore.swift`, `src_printer/`, `docs/renamer_printer_audit_interface.md`, `README.md`
 - Validation: Swift typecheck; both build-script syntax checks; Renamer audit Reader fixture; TSPL label smoke test; standalone Printer build and codesign verification; 1.1 app/zip/DMG build and codesign verification; `git diff --check`.
 - Follow-up/risk: Renamer executes `diskutil unmount force` and `diskutil mount` only after same-node/UUID preflight and then verifies the remounted node/UUID/name/mount point. No real card was unmounted during development. A disposable-card test must verify the actual Silverstack state transition. Printer remains separately built and can only read the versioned local audit JSON; its match is display context, never copy verification or erase authority.
+
+### 2026-08-09 — [codex] Require universal Developer ID notarized releases
+- Commit: `f13014a`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `scripts/build_swift_app.sh`, `README.md`
+- Validation: `/bin/bash -n scripts/build_swift_app.sh`; `swiftc -typecheck` for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; native optimized compilation of both slices; `lipo -create`, `lipo -verify_arch`, and `file` confirmed an `arm64` + `x86_64` universal binary; missing-credential execution failed before changing `Release/`; local `spctl --assess --type open --context context:primary-signature` accepted the command syntax and rejected the old ad-hoc DMG as expected; `git diff --check` passed.
+- Follow-up/risk: No valid Developer ID identity or notarytool profile is installed on this Mac, so Developer ID signing, notarization, stapling, and successful Gatekeeper acceptance could not be executed. The existing `Release/` remains the previous arm64-only ad-hoc package and must not be distributed as the new release. The strict pipeline validates credentials first and publishes staged artifacts only after all required checks pass.
