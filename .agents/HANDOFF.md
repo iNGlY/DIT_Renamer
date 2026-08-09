@@ -3,9 +3,9 @@
 ## State
 
 - Owner: Codex
-- Branch: `codex/swift-1.1-hardening`
+- Branch: `main`
 - Status: Swift 1.1 integration committed as `2c9f72d`; universal Developer ID/notarization release pipeline committed as `f13014a`; accurate bilingual About content and ARRI/CODEX CLI research committed as `2270cf4`; explicit ad-hoc GitHub prerelease flow committed as `eca1ba1`; Sparkle 2.9.5 1.1.1 update flow committed as `b28682e`; bilingual public install documentation and changelog committed as `5107187`; DIT Printer remains a separately built extension and is not included in the 1.1 app package
-- Baseline: `58618e3` (`[codex] record collaboration baseline`)
+- Baseline: `58618e3` (record collaboration baseline)
 
 ## Working agreement
 
@@ -27,9 +27,9 @@
 - Known model-detection risk: No real Sony card is mounted. Validate Sony XML/XMP location and exiftool output on representative media from the camera generations used in production; model metadata is display/audit-only and does not alter rename confidence or volume naming.
 - Known HDE risk: Public ARRI sources identify `art-cmd` as ARRI Reference Tool CMD, not CODEX Device Manager CLI. They do not document a public `codex-hde` command or size-only HDE estimate mode. `MediaScanner.swift` still probes speculative `codex-hde` paths and `MainDetailView.swift` still labels the fixed 60% estimate as an official model; remove or relabel this only after user approval.
 - Known release risk: `Release/` now contains a universal ad-hoc build explicitly labeled `adhoc-unnotarized`; Gatekeeper rejection is expected, so it is suitable only for a clearly warned GitHub Pre-release or internal test. For a stable release, install a `Developer ID Application` certificate, store a notarytool keychain profile, then run the default `scripts/build_swift_app.sh`; strict mode only replaces `Release/` after signing, notarization, stapling, and `spctl` validation all succeed.
-- Known GitHub release state: Public repository `https://github.com/iNGlY/DIT_Renamer` uses `codex/swift-1.1-hardening` as its default branch. Annotated tag `v1.1.0` remains immutable at `11227ce`; public tag `v1.1.1` and Latest Release now point to the bilingual universal 1.1.1 ad-hoc assets with DMG, ZIP, SHA-256, LICENSE, and NOTICE. GitHub CLI 2.97.0 is authenticated as `iNGlY`. GitHub Pages was not configured at the last check and must serve `/docs` for Sparkle.
+- Known GitHub release state: Public repository `https://github.com/iNGlY/DIT_Renamer` is being moved to `main` as its default branch. Annotated tag `v1.1.0` remains immutable at `11227ce`; public tag `v1.1.1` and Latest Release point to the bilingual universal 1.1.1 ad-hoc assets with DMG, ZIP, SHA-256, LICENSE, and NOTICE. GitHub CLI 2.97.0 is authenticated as `iNGlY`. GitHub Pages is configured to serve `/docs`; the public feed still needs to finish its Pages deployment after the `main` push.
 - Licensing state: Default branch commit `a89e5a6` applies Apache License 2.0 with `Copyright 2026 DIT247` and a NOTICE requiring retention of DIT247 attribution. The current GitHub release includes LICENSE and NOTICE assets and updated notes. The older immutable `v1.1.0` tag source archive itself predates the license commit; do not move the published tag, and ensure the next release tag includes `a89e5a6` or later.
 
 ## Next handoff
 
-Next agent may edit and test on this task branch. Do not merge into `main` until the real-card remount acceptance test and remaining field-safety review items are explicitly confirmed. Obtain user approval before removing the speculative `codex-hde` probe or relabeling the HDE result card. `v1.1.0` is now Latest Release by user request, but remains ad-hoc signed and unnotarized. Use the new `v1.1.1` tag rather than rewriting `v1.1.0` so the next tag source archive includes the Apache-2.0 license and current documentation. GitHub Pages configuration, actual Release publication, and end-to-end old-version-to-new-version Sparkle installation remain external acceptance steps.
+Next agent may edit and test on `main`. Do not perform the real-card remount acceptance test without an explicitly disposable card and field confirmation. The ad-hoc package remains unnotarized. The next external acceptance step is the old-version-to-new-version Sparkle installation after the `main` feed is publicly reachable.

@@ -37,7 +37,7 @@ other agent working in this repository.
 - Keep `main` as the shared integration branch.
 - Make small, coherent commits. Do not rewrite shared history.
 - Commit subject prefixes identify the authoring agent:
-  `[codex]`, `[antigravity]`, or `[agent]`.
+  `[agent]`, `[antigravity]`, or `[agent]`.
 - Every completed task must update `.agents/CHANGELOG.md` with the commit,
   affected areas, validation performed, and any follow-up risk.
 
