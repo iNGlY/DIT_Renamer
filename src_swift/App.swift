@@ -25,19 +25,21 @@ struct VisualEffectView: NSViewRepresentable {
 
 @main
 struct DITRenamerApp: App {
+    @Environment(\.openWindow) private var openWindow
     @StateObject private var volumeMonitor = VolumeMonitor()
+    @StateObject private var approvalCoordinator = RenameApprovalCoordinator.shared
     @StateObject private var updateController = UpdateController.shared
     @ObservedObject private var langManager = LanguageManager.shared
     
     @State private var selectedVolume: MountedVolume? = nil
-    @State private var isAutoRenameEnabled: Bool = false
+    @AppStorage("menuBarAutoRenameEnabled") private var isAutoRenameEnabled: Bool = false
     @State private var selectedAuditTab: AuditTab = .rename
     @State private var showAboutSheet: Bool = false
     @State private var showParaShootSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ZStack {
                 // Global Full-Window Glassmorphic Material
                 VisualEffectView(material: .fullScreenUI, blendingMode: .behindWindow)
@@ -72,6 +74,10 @@ struct DITRenamerApp: App {
             .preferredColorScheme(.dark)
             .onAppear {
                 LegacyAppMigrator.shared.migrateIfNeeded()
+                approvalCoordinator.refresh(volumes: volumeMonitor.volumes)
+            }
+            .onChange(of: volumeMonitor.volumes) { _, newVolumes in
+                approvalCoordinator.refresh(volumes: newVolumes)
             }
             .alert(item: $updateController.startupNotice) { notice in
                 Alert(
@@ -108,6 +114,34 @@ struct DITRenamerApp: App {
                 }
                 .disabled(!updateController.canCheckForUpdates)
             }
+        }
+
+        MenuBarExtra {
+            RenameMenuBarView(
+                coordinator: approvalCoordinator,
+                openMainWindow: {
+                    openMainWindow()
+                }
+            )
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: approvalCoordinator.pendingCount > 0
+                      ? "externaldrive.fill.badge.exclamationmark"
+                      : "externaldrive.fill.badge.checkmark")
+                if approvalCoordinator.pendingCount > 0 {
+                    Text("\(approvalCoordinator.pendingCount)")
+                        .font(.caption2)
+                }
+            }
+        }
+        .menuBarExtraStyle(.window)
+    }
+
+    private func openMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "main")
+        if let window = NSApp.windows.first(where: { $0.isVisible }) {
+            window.makeKeyAndOrderFront(nil)
         }
     }
 }

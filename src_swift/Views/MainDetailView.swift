@@ -5,11 +5,7 @@ struct MainDetailView: View {
     @Binding var volume: MountedVolume?
     @ObservedObject var monitor: VolumeMonitor
     @Binding var isAutoRenameEnabled: Bool
-    @ObservedObject private var operationCoordinator = MediaOperationCoordinator.shared
-    
-    public static var autoRenamedSessionNodes: Set<String> = []
-    
-    @AppStorage("renameHistoryData") private var historyData: Data = Data()
+    @ObservedObject private var approvalCoordinator = RenameApprovalCoordinator.shared
     
     @State private var scanResult: ScanResult? = nil
     @State private var scanVolumeID: String? = nil
@@ -38,11 +34,14 @@ struct MainDetailView: View {
     let letters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map { String($0) }
     
     var previewNewName: String {
-        let reuse = Int(reuseInput) ?? 0
-        var name = "\(selectedLetter)\(rollInput)"
-        if reuse > 0 { name += "-\(reuse)" }
-        if includeDetectedSuffix, let suffix = scanResult?.suffix { name += suffix }
-        return name
+        let request = VolumeNameRequest(
+            cameraLetter: selectedLetter,
+            rollNumber: rollInput,
+            reuseCount: Int(reuseInput) ?? 0,
+            suffix: scanResult?.suffix,
+            includeSuffix: includeDetectedSuffix
+        )
+        return (try? VolumeNameBuilder.build(request, fileSystem: volume?.fileSystem ?? "")) ?? "\(selectedLetter.uppercased())\(rollInput)"
     }
 
     var body: some View {
@@ -400,65 +399,40 @@ struct MainDetailView: View {
         guard !isRenaming, scanVolumeID == v.id, result.isScanComplete else { return }
         
         let targetName = previewNewName
-        let alreadyInHistory = RenameHistoryStore.shared.items.contains { record in
-            record.newName == targetName && (record.volumeUUID == v.volumeUUID ||
-                (record.volumeUUID == nil && (result.firstClipName == nil || record.firstClipName == result.firstClipName)))
-        }
-        
+        guard let candidate = approvalCoordinator.ingest(volume: v, scan: result, requestedName: targetName) else { return }
+
         if isAutoRenameEnabled
             && v.isGenericName
-            && result.isHighConfidence
-            && !result.isUnconfiguredCamera
-            && !result.isEmptyCard
-            && !result.isPhotoOnly
-            && !result.isUnformattedCard
-            && result.suggestedName != nil
-            && !alreadyInHistory {
-            
-            performRename()
+            && candidate.canBeBatchApproved {
+            Task {
+                _ = await approvalCoordinator.approveSuggestedName(candidateID: candidate.id)
+            }
         }
     }
-    
+
     private func performRename() {
         guard let vol = volume else { return }
         guard !isRenaming, let result = scanResult, scanVolumeID == vol.id else { return }
-        guard vol.volumeUUID != nil else {
-            activeAlert = .resultNotice(message: langManager.text("未能确认卡片 UUID，已取消重命名。", "The card UUID could not be verified; rename cancelled."))
+        guard let candidate = approvalCoordinator.ingest(volume: vol, scan: result, requestedName: previewNewName) else {
+            activeAlert = .resultNotice(message: langManager.text("当前卡片无法进入安全审批队列，请重新扫描后再试。", "This card could not enter the safe approval queue. Rescan it and try again."))
             return
         }
         isRenaming = true
-        operationCoordinator.beginOperation()
-        let oldName = vol.name
-        let newName = previewNewName
-        let volumeSnapshot = vol
-        let scanSnapshot = result
-        
-        RenamerEngine.renameVolume(
-            at: volumeSnapshot.path,
-            bsdNode: volumeSnapshot.bsdNode,
-            volumeUUID: volumeSnapshot.volumeUUID,
-            mediaUUID: volumeSnapshot.mediaUUID,
-            fileSystem: volumeSnapshot.fileSystem,
-            to: newName
-        ) { success, msg, actualName in
+        let request = VolumeNameRequest(
+            cameraLetter: selectedLetter,
+            rollNumber: rollInput,
+            reuseCount: Int(reuseInput) ?? 0,
+            suffix: result.suffix,
+            includeSuffix: includeDetectedSuffix
+        )
+        Task {
+            let execution = await approvalCoordinator.assignVolumeName(candidateID: candidate.id, request: request)
             isRenaming = false
-            operationCoordinator.endOperation()
-            if let actualName {
-                let persisted = saveHistoryItem(
-                    oldName: oldName,
-                    requestedName: newName,
-                    actualName: actualName,
-                    volume: volumeSnapshot,
-                    scan: scanSnapshot
-                )
-                if !persisted {
-                    activeAlert = .resultNotice(message: langManager.text("卷已重命名，但审计记录保存失败，请立即手动记录并检查权限。", "The volume was renamed, but the audit record could not be saved. Record it manually and check permissions."))
-                    return
-                }
+            if execution.success {
                 volume = nil
                 monitor.refreshVolumes()
             }
-            activeAlert = .resultNotice(message: msg)
+            activeAlert = .resultNotice(message: execution.message)
         }
     }
     
@@ -479,49 +453,10 @@ struct MainDetailView: View {
                 if let roll = result.rollNumber { self.rollInput = roll }
                 self.isSuspiciousWarning = self.isAutoRenameEnabled &&
                     (!result.isHighConfidence || !selectedVolume.isGenericName)
+                _ = self.approvalCoordinator.ingest(volume: selectedVolume, scan: result, requestedName: self.previewNewName)
                 self.checkAndAutoRename()
             }
         }
-    }
-
-    @discardableResult
-    private func saveHistoryItem(
-        oldName: String,
-        requestedName: String,
-        actualName: String,
-        volume vol: MountedVolume,
-        scan scanResult: ScanResult
-    ) -> Bool {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let todayStr = formatter.string(from: Date())
-        
-        let item = RenameHistoryItem(
-            id: UUID(),
-            originalName: oldName,
-            newName: actualName,
-            firstClipName: scanResult.firstClipName,
-            lastClipName: scanResult.lastClipName,
-            clipCount: scanResult.clipCount,
-            totalFileCount: scanResult.totalFileCount,
-            usedSpace: vol.usedGBFormatted,
-            deviceType: scanResult.deviceType,
-            timestamp: Date(),
-            dateDayString: todayStr,
-            isUnformatted: scanResult.isUnformattedCard,
-            isEmptyCard: scanResult.isEmptyCard,
-            requestedName: requestedName,
-            volumeUUID: vol.volumeUUID,
-            mediaUUID: vol.mediaUUID,
-            bsdNode: vol.bsdNode,
-            mountedPath: vol.path
-        )
-        
-        guard RenameHistoryStore.shared.add(item) else { return false }
-        if let encoded = try? JSONEncoder().encode(RenameHistoryStore.shared.items) {
-            historyData = encoded
-        }
-        return true
     }
 }
 

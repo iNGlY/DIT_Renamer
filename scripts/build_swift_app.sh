@@ -23,8 +23,12 @@ case "$RELEASE_MODE" in
         ARTIFACT_SUFFIX="-adhoc-unnotarized"
         DMG_VOLUME_NAME="DIT Renamer $VERSION Ad-hoc"
         ;;
+    test)
+        ARTIFACT_SUFFIX="-test-adhoc-unnotarized"
+        DMG_VOLUME_NAME="DIT Renamer $VERSION Test"
+        ;;
     *)
-        echo "[ERROR] DIT_RENAMER_RELEASE_MODE must be 'developer-id' or 'adhoc'." >&2
+        echo "[ERROR] DIT_RENAMER_RELEASE_MODE must be 'developer-id', 'adhoc', or 'test'." >&2
         exit 1
         ;;
 esac
@@ -65,8 +69,13 @@ if [[ "$RELEASE_MODE" == "developer-id" ]]; then
         --keychain-profile "$NOTARY_PROFILE" \
         --output-format json >/dev/null || fail "The notarytool profile is unavailable or could not authenticate."
 else
-    echo "[WARNING] Building an ad-hoc signed, unnotarized release."
-    echo "[WARNING] Gatekeeper acceptance is not expected and this build is not suitable as a normal end-user release."
+    if [[ "$RELEASE_MODE" == "test" ]]; then
+        echo "[WARNING] Building a 1.2 Test ad-hoc signed, unnotarized package."
+        echo "[WARNING] This package is for controlled testing and is not a normal end-user release."
+    else
+        echo "[WARNING] Building an ad-hoc signed, unnotarized release."
+        echo "[WARNING] Gatekeeper acceptance is not expected and this build is not suitable as a normal end-user release."
+    fi
 fi
 
 cd "$PROJECT_ROOT"
@@ -234,7 +243,7 @@ DIT Renamer 已使用 Apple Developer ID 签名、完成 notarization 并附加�
 EOF
 else
     cat <<EOF > "$DMG_STAGE/安装说明.txt"
-DIT Renamer ${VERSION} Ad-hoc 预发布版
+DIT Renamer $VERSION Test 测试版
 
 此构建未使用 Apple Developer ID 签名，也没有经过 Apple notarization。
 macOS Gatekeeper 可能阻止从 GitHub 下载的应用直接启动，因此本包不能视为“即开即用”的正式分发版本。
@@ -271,11 +280,13 @@ mkdir -p "$SOURCE_DIR"
 git archive --format=tar HEAD --output="$SOURCE_ARCHIVE"
 tar -xf "$SOURCE_ARCHIVE" -C "$SOURCE_DIR"
 
-if [[ -f "$PROJECT_ROOT/docs/github_release_notes_1.1.1.md" ]]; then
-    cp "$PROJECT_ROOT/docs/github_release_notes_1.1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
+RELEASE_NOTES_PATH="$PROJECT_ROOT/docs/github_release_notes_$VERSION.md"
+if [[ -f "$RELEASE_NOTES_PATH" ]]; then
+    cp "$RELEASE_NOTES_PATH" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
 fi
-if [[ -f "$PROJECT_ROOT/docs/github_release_1.1.1.md" ]]; then
-    cp "$PROJECT_ROOT/docs/github_release_1.1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_REQUIREMENTS.md"
+RELEASE_REQUIREMENTS_PATH="$PROJECT_ROOT/docs/github_release_$VERSION.md"
+if [[ -f "$RELEASE_REQUIREMENTS_PATH" ]]; then
+    cp "$RELEASE_REQUIREMENTS_PATH" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_REQUIREMENTS.md"
 fi
 
 (
@@ -308,6 +319,9 @@ CHECKSUM_PATH="$RELEASE_DIR/SHA256SUMS.txt"
 echo "=================================================="
 if [[ "$RELEASE_MODE" == "developer-id" ]]; then
     echo "[SUCCESS] Signed, notarized, stapled, Gatekeeper-verified release complete"
+elif [[ "$RELEASE_MODE" == "test" ]]; then
+    echo "[SUCCESS] 1.2 Test ad-hoc signed package complete"
+    echo "  WARNING: This is a controlled test build and is not notarized."
 else
     echo "[SUCCESS] Ad-hoc signed, unnotarized release complete"
     echo "  WARNING: Gatekeeper acceptance is not expected."

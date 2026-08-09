@@ -1,6 +1,28 @@
 import Foundation
 
 public final class RenamerEngine {
+    public static func renameVolumeAsync(
+        at path: String,
+        bsdNode: String,
+        volumeUUID: String?,
+        mediaUUID: String?,
+        fileSystem: String = "",
+        to requestedName: String
+    ) async -> (success: Bool, message: String, actualName: String?) {
+        await withCheckedContinuation { continuation in
+            renameVolume(
+                at: path,
+                bsdNode: bsdNode,
+                volumeUUID: volumeUUID,
+                mediaUUID: mediaUUID,
+                fileSystem: fileSystem,
+                to: requestedName
+            ) { success, message, actualName in
+                continuation.resume(returning: (success, message, actualName))
+            }
+        }
+    }
+
     public static func renameVolume(
         at path: String,
         bsdNode: String,
@@ -110,7 +132,7 @@ public final class RenamerEngine {
                     actualName: remounted.volumeName
                 )
             } catch {
-                complete(completion, success: false, message: "系统执行错误：(error.localizedDescription)")
+                complete(completion, success: false, message: "系统执行错误：\(error.localizedDescription)")
             }
         }
     }
