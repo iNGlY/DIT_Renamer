@@ -150,8 +150,8 @@ and handoff context.
 - Follow-up/risk: The free ad-hoc build still may require a one-time Gatekeeper approval. GitHub Pages and an actual 1.1.1 GitHub Release asset must exist before the public appcast can advertise this update.
 
 ### 2026-08-10 — [codex] Add bilingual public documentation and DMG install shortcut
-- Commit: `pending`
+- Commit: `5107187`
 - Branch: `codex/swift-1.1-hardening`
 - Changed: Bilingual `README.md`, public bilingual `CHANGELOG.md`, first-install instructions, and DMG `/Applications` shortcut validation.
-- Validation: arm64/x86_64 Swift typechecks; Bash syntax checks; `git diff --check`; final DMG shortcut inspection pending after the clean release build.
+- Validation: arm64/x86_64 Swift typechecks; Bash syntax checks; `git diff --check`; clean universal ad-hoc build; strict App/Sparkle signature verification; SHA-256 checks; mounted-DMG inspection confirming `Applications -> /Applications`; main App launch smoke test; DIT Printer build/signature check; TSPL label renderer and Renamer audit reader fixture tests.
 - Follow-up/risk: The ad-hoc package remains unnotarized and may require one-time Gatekeeper approval. GitHub Release publication and GitHub Pages appcast deployment are still separate external steps.
