@@ -27,18 +27,29 @@ DIT_Renamer/
 
 ## 构建
 
-需要 macOS 14 或更高版本，以及 Apple Swift 编译器。构建前建议先运行类型检查：
+需要 macOS 14 或更高版本、Apple Swift 编译器、Developer ID Application 证书，以及已保存到钥匙串的 notarytool profile。构建前建议对两个架构运行类型检查：
 
 ```bash
 swiftc -typecheck -target arm64-apple-macosx14.0 $(find src_swift -name '*.swift' -print)
+swiftc -typecheck -target x86_64-apple-macosx14.0 $(find src_swift -name '*.swift' -print)
 bash -n scripts/build_swift_app.sh
 ```
 
-生成 1.1 的 `.app`、`.zip` 和 `.dmg`：
+首次发布前，将 Apple notarization 凭据保存到钥匙串：
 
 ```bash
+xcrun notarytool store-credentials "DITRenamer-Notary" --apple-id "APPLE_ID" --team-id "TEAM_ID"
+```
+
+生成 universal（arm64 + x86_64）的 1.1 `.app`、`.zip` 和 `.dmg`：
+
+```bash
+export DIT_RENAMER_SIGNING_IDENTITY="Developer ID Application: Team Name (TEAMID)"
+export DIT_RENAMER_NOTARY_PROFILE="DITRenamer-Notary"
 ./scripts/build_swift_app.sh
 ```
+
+脚本会在构建前验证签名身份和 notarization profile，不会回退到 ad-hoc 签名。它会分别公证并 staple App 与 DMG，随后使用本机 Gatekeeper `spctl` 验证；只有全部步骤通过后才替换 `Release/`。发布镜像中不包含 `sudo xattr`、隔离属性清除命令或 Gatekeeper 绕过工具。
 
 输出只写入项目内的 `build_swift/` 和 `Release/`，这两个目录属于生成物，不是源代码输入。
 
