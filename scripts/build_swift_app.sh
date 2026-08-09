@@ -1,13 +1,18 @@
 #!/bin/bash
-# Builds the DIT Renamer 1.1 release in strict Developer ID or explicit ad-hoc mode.
+# Builds a universal DIT Renamer release with Sparkle-based updates.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RELEASE_DIR="$PROJECT_ROOT/Release"
 BUILD_DIR="$PROJECT_ROOT/build_swift"
+RELEASE_DIR="${DIT_RENAMER_RELEASE_DIR:-$RELEASE_DIR}"
+BUILD_DIR="${DIT_RENAMER_BUILD_DIR:-$BUILD_DIR}"
 STAGED_RELEASE_DIR="$BUILD_DIR/Release"
-VERSION="1.1"
+VERSION="${DIT_RENAMER_VERSION:-1.1.1}"
+BUILD_NUMBER="${DIT_RENAMER_BUILD_NUMBER:-1110}"
+SPARKLE_PUBLIC_ED_KEY="${DIT_RENAMER_SPARKLE_PUBLIC_ED_KEY:-+X/X+R9CiO+z1igmTrgXdJWl6PPSD5zs0AS/iOq2gmk=}"
+SPARKLE_FEED_URL="${DIT_RENAMER_SPARKLE_FEED_URL:-https://ingly.github.io/DIT_Renamer/appcast.xml}"
 RELEASE_MODE="${DIT_RENAMER_RELEASE_MODE:-developer-id}"
 case "$RELEASE_MODE" in
     developer-id)
@@ -24,7 +29,7 @@ case "$RELEASE_MODE" in
         ;;
 esac
 APP_NAME="dit_renamer_Release_${VERSION}${ARTIFACT_SUFFIX}"
-APP_BUNDLE="$STAGED_RELEASE_DIR/$APP_NAME.app"
+APP_BUNDLE="$STAGED_RELEASE_DIR/DIT Renamer.app"
 ZIP_PATH="$STAGED_RELEASE_DIR/$APP_NAME.zip"
 DMG_PATH="$STAGED_RELEASE_DIR/$APP_NAME.dmg"
 SOURCE_DIR="$STAGED_RELEASE_DIR/Source Code"
@@ -40,7 +45,7 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Required command is unavailable: $1"
 }
 
-for required in swiftc lipo codesign ditto hdiutil git tar shasum; do
+for required in swiftc lipo codesign ditto hdiutil git tar shasum curl; do
     require_command "$required"
 done
 
@@ -65,7 +70,16 @@ else
 fi
 
 cd "$PROJECT_ROOT"
-[[ -z "$(git status --porcelain)" ]] || fail "Commit all source changes and untracked files before creating a release."
+if [[ "${DIT_RENAMER_ALLOW_DIRTY_BUILD:-0}" == "1" ]]; then
+    echo "[WARNING] Dirty-build override enabled; Release metadata is for local validation only."
+else
+    [[ -z "$(git status --porcelain)" ]] || fail "Commit all source changes and untracked files before creating a release."
+fi
+
+SPARKLE_ROOT="$(bash "$SCRIPT_DIR/bootstrap_sparkle.sh")"
+SPARKLE_FRAMEWORK_SOURCE="$SPARKLE_ROOT/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+SPARKLE_FRAMEWORK_DIR="$SPARKLE_ROOT/Sparkle.xcframework/macos-arm64_x86_64"
+[[ -d "$SPARKLE_FRAMEWORK_SOURCE" ]] || fail "Sparkle framework is unavailable."
 
 SWIFT_FILES=()
 while IFS= read -r -d '' source_file; do
@@ -78,15 +92,19 @@ echo "[BUILD] DIT Renamer $VERSION universal $RELEASE_MODE release"
 echo "=================================================="
 
 rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR/arm64" "$BUILD_DIR/x86_64" "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
+mkdir -p "$BUILD_DIR/arm64" "$BUILD_DIR/x86_64" "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources" "$APP_BUNDLE/Contents/Frameworks"
 
 echo "[COMPILE] Building arm64..."
 swiftc -parse-as-library -O -target arm64-apple-macosx14.0 \
+    -F "$SPARKLE_FRAMEWORK_DIR" -framework Sparkle \
+    -Xlinker -rpath -Xlinker '@executable_path/../Frameworks' \
     -o "$BUILD_DIR/arm64/DITRenamer" \
     "${SWIFT_FILES[@]}"
 
 echo "[COMPILE] Building x86_64..."
 swiftc -parse-as-library -O -target x86_64-apple-macosx14.0 \
+    -F "$SPARKLE_FRAMEWORK_DIR" -framework Sparkle \
+    -Xlinker -rpath -Xlinker '@executable_path/../Frameworks' \
     -o "$BUILD_DIR/x86_64/DITRenamer" \
     "${SWIFT_FILES[@]}"
 
@@ -96,6 +114,9 @@ lipo -create \
     "$BUILD_DIR/x86_64/DITRenamer" \
     -output "$APP_BUNDLE/Contents/MacOS/DITRenamer"
 lipo "$APP_BUNDLE/Contents/MacOS/DITRenamer" -verify_arch arm64 x86_64
+
+echo "[EMBED] Copying Sparkle.framework..."
+ditto "$SPARKLE_FRAMEWORK_SOURCE" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 
 if [[ -f "$PROJECT_ROOT/AppIcon.icns" ]]; then
     cp "$PROJECT_ROOT/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
@@ -121,21 +142,55 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${VERSION}</string>
+    <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>${SPARKLE_FEED_URL}</string>
+    <key>SUPublicEDKey</key>
+    <string>${SPARKLE_PUBLIC_ED_KEY}</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
 </dict>
 </plist>
 EOF
 
+sign_nested_code() {
+    local identity="$1"
+    local framework="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B"
+    local sign_options=(--force --sign "$identity")
+    if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+        sign_options+=(--options runtime --timestamp)
+    fi
+
+    if [[ -d "$framework/XPCServices" ]]; then
+        for service in "$framework/XPCServices"/*.xpc; do
+            [[ -e "$service" ]] || continue
+            if [[ "$(basename "$service")" == "Downloader.xpc" && "$RELEASE_MODE" == "developer-id" ]]; then
+                codesign "${sign_options[@]}" --preserve-metadata=entitlements "$service"
+            else
+                codesign "${sign_options[@]}" "$service"
+            fi
+        done
+    fi
+    codesign "${sign_options[@]}" "$framework/Autoupdate"
+    codesign "${sign_options[@]}" "$framework/Updater.app"
+    codesign "${sign_options[@]}" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+    codesign "${sign_options[@]}" "$APP_BUNDLE"
+}
+
 if [[ "$RELEASE_MODE" == "developer-id" ]]; then
-    echo "[SIGN] Signing app with Developer ID and secure timestamp..."
-    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
+    echo "[SIGN] Signing Sparkle helpers and app with Developer ID and secure timestamp..."
+    sign_nested_code "$SIGNING_IDENTITY"
 else
-    echo "[SIGN] Applying ad-hoc signature to app..."
-    codesign --force --sign - "$APP_BUNDLE"
+    echo "[SIGN] Applying ad-hoc signatures to Sparkle helpers and app..."
+    sign_nested_code -
 fi
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
@@ -177,8 +232,8 @@ DIT Renamer 已使用 Apple Developer ID 签名、完成 notarization 并附加�
 如果 macOS 拒绝启动，请保留原始 DMG，并向发布者报告系统版本和提示文本。
 EOF
 else
-    cat <<'EOF' > "$DMG_STAGE/安装说明.txt"
-DIT Renamer 1.1 Ad-hoc 预发布版
+    cat <<EOF > "$DMG_STAGE/安装说明.txt"
+DIT Renamer ${VERSION} Ad-hoc 预发布版
 
 此构建未使用 Apple Developer ID 签名，也没有经过 Apple notarization。
 macOS Gatekeeper 可能阻止从 GitHub 下载的应用直接启动，因此本包不能视为“即开即用”的正式分发版本。
@@ -215,18 +270,18 @@ mkdir -p "$SOURCE_DIR"
 git archive --format=tar HEAD --output="$SOURCE_ARCHIVE"
 tar -xf "$SOURCE_ARCHIVE" -C "$SOURCE_DIR"
 
-if [[ -f "$PROJECT_ROOT/docs/github_release_notes_1.1.md" ]]; then
-    cp "$PROJECT_ROOT/docs/github_release_notes_1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
+if [[ -f "$PROJECT_ROOT/docs/github_release_notes_1.1.1.md" ]]; then
+    cp "$PROJECT_ROOT/docs/github_release_notes_1.1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
 fi
-if [[ -f "$PROJECT_ROOT/docs/github_release_1.1.md" ]]; then
-    cp "$PROJECT_ROOT/docs/github_release_1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_REQUIREMENTS.md"
+if [[ -f "$PROJECT_ROOT/docs/github_release_1.1.1.md" ]]; then
+    cp "$PROJECT_ROOT/docs/github_release_1.1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_REQUIREMENTS.md"
 fi
 
 (
     cd "$STAGED_RELEASE_DIR"
     shasum -a 256 "$(basename "$ZIP_PATH")" "$(basename "$DMG_PATH")" > SHA256SUMS.txt
-    printf 'commit=%s\nrelease_mode=%s\narchitectures=arm64 x86_64\n' \
-        "$(git -C "$PROJECT_ROOT" rev-parse HEAD)" "$RELEASE_MODE" > RELEASE_METADATA.txt
+    printf 'commit=%s\nrelease_mode=%s\nversion=%s\nbuild=%s\narchitectures=arm64 x86_64\n' \
+        "$(git -C "$PROJECT_ROOT" rev-parse HEAD)" "$RELEASE_MODE" "$VERSION" "$BUILD_NUMBER" > RELEASE_METADATA.txt
 )
 
 echo "[PUBLISH] Replacing Release only after all validation passed..."
@@ -243,7 +298,7 @@ if ! mv "$STAGED_RELEASE_DIR" "$RELEASE_DIR"; then
 fi
 rm -rf "$PREVIOUS_RELEASE_DIR"
 
-APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
+APP_BUNDLE="$RELEASE_DIR/DIT Renamer.app"
 ZIP_PATH="$RELEASE_DIR/$APP_NAME.zip"
 DMG_PATH="$RELEASE_DIR/$APP_NAME.dmg"
 SOURCE_DIR="$RELEASE_DIR/Source Code"

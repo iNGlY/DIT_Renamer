@@ -1,8 +1,8 @@
-# DIT Renamer 1.1
+# DIT Renamer 1.1.1
 
 DIT Renamer 是基于 Swift 构建的 macOS 现场 DIT 工具，用于识别可移除摄影机媒体、生成卷名建议并记录重命名审计信息。大部分功能实现代码由 AI 完成。
 
-**下载当前版本：[DIT Renamer 1.1 Release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
+**下载当前版本：[DIT Renamer 1.1.1 Release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
 ## 运行边界
 
@@ -42,7 +42,7 @@ bash -n scripts/build_swift_app.sh
 xcrun notarytool store-credentials "DITRenamer-Notary" --apple-id "APPLE_ID" --team-id "TEAM_ID"
 ```
 
-生成 universal（arm64 + x86_64）的 1.1 `.app`、`.zip` 和 `.dmg`：
+生成 universal（arm64 + x86_64）的 1.1.1 `.app`、`.zip` 和 `.dmg`：
 
 ```bash
 export DIT_RENAMER_SIGNING_IDENTITY="Developer ID Application: Team Name (TEAMID)"
@@ -60,7 +60,15 @@ DIT_RENAMER_RELEASE_MODE=adhoc ./scripts/build_swift_app.sh
 
 该模式不会调用 notarization、staple 或 Gatekeeper 通过检查，资产名称会包含 `adhoc-unnotarized`，DMG 内也会明确标注风险。它不会成为静默回退路径；默认构建仍严格要求 Developer ID。由于 GitHub 下载会附带 quarantine 属性，ad-hoc 构建无法保证普通用户双击即开，不应标记为正式稳定版。
 
-GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.md`](docs/github_release_1.1.md)。完成 GitHub CLI 登录并配置 `origin` 后，可使用 `scripts/publish_github_release.sh` 校验资产、推送分支与 `v1.1.0` 标签，并创建 GitHub Latest Release。
+### 在线更新（免费 ad-hoc 模式）
+
+应用内置 Sparkle 2.9.5。首次安装需要用户将 `DIT Renamer.app` 放入 `/Applications` 或 `~/Applications` 并允许 macOS 打开一次；后续启动时会后台检查 GitHub Pages 的 appcast，只有发现更新才显示提示。用户点击更新后，Sparkle 会在原路径验证并替换整个 App，完成后用户只需点击重新启动，不需要再次拖拽 App。
+
+Sparkle 发行包由 `scripts/bootstrap_sparkle.sh` 固定下载并校验 SHA-256，依赖保存在被忽略的 `.deps/`。发布更新归档前，使用 `scripts/generate_appcast.sh <更新归档目录>` 生成 EdDSA 签名 appcast；EdDSA 私钥只保存在本机钥匙串，不得提交仓库。更新不会在卷重命名、强制卸载或重挂载事务中安装，更新后还会验证目标 `CFBundleVersion`，失败时保留旧版本。
+
+无 Developer ID 时，后续替换流程可以工作，但 Gatekeeper 仍可能要求用户手动允许打开；这不是 Sparkle EdDSA 能消除的限制。
+
+GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.1.md`](docs/github_release_1.1.1.md)。完成 GitHub CLI 登录并配置 `origin` 后，可使用 `scripts/publish_github_release.sh` 校验资产、推送分支与 `v1.1.1` 标签，并创建 GitHub Latest Release；更新 appcast 由 `scripts/generate_appcast.sh` 生成。
 
 输出只写入项目内的 `build_swift/` 和 `Release/`，这两个目录属于生成物，不是源代码输入。
 

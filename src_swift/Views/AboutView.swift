@@ -42,7 +42,7 @@ struct AboutView: View {
                     Text("DIT Renamer")
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text("Release 1.1")
+                    Text("Release \(DITRenamerAppInfo.shortVersion)")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .padding(.horizontal, 8)
@@ -157,8 +157,8 @@ struct AboutView: View {
                 title: langManager.text("版本边界", "Version Boundary")
             )
             Text(langManager.text(
-                "DIT Printer 是独立扩展，不包含在 DIT Renamer 1.1 应用中。Renamer 仅提供只读审计数据接口，不能通过 Printer 触发重命名、校验或擦除操作。",
-                "DIT Printer is a separate extension and is not included in the DIT Renamer 1.1 application. Renamer only exposes a read-only audit-data interface; Printer cannot trigger rename, verification, or erase operations."
+                "DIT Printer 是独立扩展，不包含在 DIT Renamer 应用中。Renamer 仅提供只读审计数据接口，不能通过 Printer 触发重命名、校验或擦除操作。",
+                "DIT Printer is a separate extension and is not included in the DIT Renamer application. Renamer only exposes a read-only audit-data interface; Printer cannot trigger rename, verification, or erase operations."
             ))
             .font(.caption)
             .foregroundColor(.secondary)

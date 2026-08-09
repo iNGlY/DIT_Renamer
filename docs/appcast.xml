@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+    <channel>
+        <title>DIT Renamer</title>
+        <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
+        <description>DIT Renamer updates</description>
+        <language>zh-cn</language>
+    </channel>
+</rss>

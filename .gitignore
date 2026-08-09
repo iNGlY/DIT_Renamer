@@ -30,3 +30,4 @@ env/
 /build_swift/
 /build_printer/
 /Release/
+.deps/

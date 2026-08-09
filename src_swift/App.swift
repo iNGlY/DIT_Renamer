@@ -26,6 +26,7 @@ struct VisualEffectView: NSViewRepresentable {
 @main
 struct DITRenamerApp: App {
     @StateObject private var volumeMonitor = VolumeMonitor()
+    @StateObject private var updateController = UpdateController.shared
     @ObservedObject private var langManager = LanguageManager.shared
     
     @State private var selectedVolume: MountedVolume? = nil
@@ -69,6 +70,20 @@ struct DITRenamerApp: App {
             }
             .frame(minWidth: 1180, idealWidth: 1180, minHeight: 680, idealHeight: 680)
             .preferredColorScheme(.dark)
+            .onAppear {
+                LegacyAppMigrator.shared.migrateIfNeeded()
+            }
+            .alert(item: $updateController.startupNotice) { notice in
+                Alert(
+                    title: Text(notice.title),
+                    message: Text(notice.message),
+                    dismissButton: .default(Text(notice.actionTitle ?? langManager.text("知道了", "OK"))) {
+                        if let actionURL = notice.actionURL {
+                            NSWorkspace.shared.open(actionURL)
+                        }
+                    }
+                )
+            }
             .sheet(isPresented: $showAboutSheet) {
                 AboutView()
             }
@@ -86,6 +101,12 @@ struct DITRenamerApp: App {
                 Button(langManager.text("关于 DIT Renamer", "About DIT Renamer")) {
                     showAboutSheet = true
                 }
+            }
+            CommandGroup(after: .appInfo) {
+                Button(langManager.text("检查更新…", "Check for Updates…")) {
+                    updateController.checkForUpdates()
+                }
+                .disabled(!updateController.canCheckForUpdates)
             }
         }
     }

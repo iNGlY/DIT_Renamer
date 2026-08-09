@@ -127,3 +127,24 @@ and handoff context.
 - Changed: README release link and Swift/AI description, About copy, GitHub release scripts/notes, and `docs/` cleanup
 - Validation: Swift typecheck passed for arm64 and x86_64; both release scripts passed macOS Bash syntax checks; `git diff --check` passed; removed five internal/general research documents; GitHub repository description updated; `v1.1.0` changed from Pre-release to Latest Release and notes updated.
 - Follow-up/risk: Latest status does not change the assets' ad-hoc signature or lack of Apple notarization. Asset names and release notes continue to state this limitation. The published `v1.1.0` tag remains immutable at `11227ce`; future release tags must include the documentation, license, and publisher updates now on the default branch.
+
+### 2026-08-10 — [codex] Research in-app online updates
+- Commit: `uncommitted`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `docs/research_online_updates.md`
+- Validation: Sparkle 2.9.5 release metadata and binary package inspected; official Sparkle setup, customization, publishing, security, Apple notarization, GitHub Pages, and GitHub Actions documentation checked; linked pages returned HTTP 200; `git diff --check` passed for tracked changes.
+- Follow-up/risk: No application code was changed. Implementing Sparkle requires a stable `.app` name, embedded/signed nested helpers, an EdDSA key strategy, a hosted appcast, and Developer ID/notarization before reliable Gatekeeper-compatible automatic installation can be enabled. Version migration should replace the stable app in place and move only verified legacy copies to the user's Trash after a successful launch; it must not perform broad or permanent deletion.
+
+### 2026-08-10 — [codex] Implement free Sparkle update mode
+- Commit: `uncommitted`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `src_swift/Models/UpdateController.swift`, `src_swift/App.swift`, `src_swift/Views/MainDetailView.swift`, version labels, `scripts/build_swift_app.sh`, `scripts/bootstrap_sparkle.sh`, `scripts/generate_appcast.sh`, `scripts/publish_github_release.sh`, `docs/appcast.xml`, `README.md`, `.gitignore`, and online-update research documentation.
+- Validation: Sparkle 2.9.5 archive downloaded and SHA-256 verified; arm64/x86_64 Swift typechecks passed; all Bash syntax checks passed; temporary universal ad-hoc App/ZIP/DMG build passed; nested Sparkle signatures and main App passed `codesign --verify --deep --strict`; `lipo --verify_arch arm64 x86_64`, `otool` rpath inspection, Info.plist update-key inspection, ZIP/DMG SHA-256 checks, and XML appcast validation passed; EdDSA appcast generation passed with a protected temporary key file.
+- Follow-up/risk: No Developer ID or notarization was added by design. The first Sparkle-enabled build must be installed manually once, GitHub Pages must serve `docs/appcast.xml`, and the private EdDSA key must remain in the publisher keychain or a protected external file. Gatekeeper may still require manual approval for ad-hoc releases.
+
+### 2026-08-10 — [codex] Finish 1.1.1 update release preparation
+- Commit: `pending`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: Sparkle update integration, universal build/release scripts, 1.1.1 GitHub release requirements and notes, appcast generation, README version links, and dynamic release copy.
+- Validation: Swift typecheck for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; Bash syntax checks; `git diff --check`; empty appcast input rejection; final universal ad-hoc build and signed appcast validation pending after commit.
+- Follow-up/risk: The free ad-hoc build still may require a one-time Gatekeeper approval. GitHub Pages and an actual 1.1.1 GitHub Release asset must exist before the public appcast can advertise this update.

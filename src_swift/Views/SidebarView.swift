@@ -46,7 +46,7 @@ struct SidebarView: View {
                     Text("DIT Renamer")
                         .font(.headline)
                         .fontWeight(.bold)
-                    Text("Release 1.1")
+                    Text("Release \(DITRenamerAppInfo.shortVersion)")
                         .font(.caption2)
                         .foregroundColor(.blue)
                 }

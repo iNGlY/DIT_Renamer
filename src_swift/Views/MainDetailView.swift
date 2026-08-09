@@ -5,6 +5,7 @@ struct MainDetailView: View {
     @Binding var volume: MountedVolume?
     @ObservedObject var monitor: VolumeMonitor
     @Binding var isAutoRenameEnabled: Bool
+    @ObservedObject private var operationCoordinator = MediaOperationCoordinator.shared
     
     public static var autoRenamedSessionNodes: Set<String> = []
     
@@ -52,7 +53,7 @@ struct MainDetailView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     Spacer()
-                    Text("Release 1.1")
+                    Text("Release \(DITRenamerAppInfo.shortVersion)")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .padding(.horizontal, 6)
@@ -426,6 +427,7 @@ struct MainDetailView: View {
             return
         }
         isRenaming = true
+        operationCoordinator.beginOperation()
         let oldName = vol.name
         let newName = previewNewName
         let volumeSnapshot = vol
@@ -440,6 +442,7 @@ struct MainDetailView: View {
             to: newName
         ) { success, msg, actualName in
             isRenaming = false
+            operationCoordinator.endOperation()
             if let actualName {
                 let persisted = saveHistoryItem(
                     oldName: oldName,
