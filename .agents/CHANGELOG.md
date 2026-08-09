@@ -120,3 +120,10 @@ and handoff context.
 - Changed: `LICENSE`, `NOTICE`, `README.md`, Swift entry/About attribution, release documentation, and release packaging scripts
 - Validation: `LICENSE` matched the official Apache License 2.0 text byte-for-byte after substituting the appendix copyright placeholder with `Copyright 2026 DIT247`; Swift typecheck passed for arm64 and x86_64; both release scripts passed macOS Bash syntax checks; `git diff --check` passed; GitHub default branch was pushed; `v1.1.0` notes were updated and `LICENSE`/`NOTICE` assets uploaded.
 - Follow-up/risk: The immutable `v1.1.0` tag still resolves to pre-license commit `11227ce`, so GitHub's automatic tag source archives do not contain the new legal files. The attached LICENSE/NOTICE and updated release notes state the license for the distributed assets; the next version tag must point to a commit containing `a89e5a6` or later.
+
+### 2026-08-09 — [codex] Streamline public docs and mark v1.1.0 latest
+- Commit: `59a0962`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: README release link and Swift/AI description, About copy, GitHub release scripts/notes, and `docs/` cleanup
+- Validation: Swift typecheck passed for arm64 and x86_64; both release scripts passed macOS Bash syntax checks; `git diff --check` passed; removed five internal/general research documents; GitHub repository description updated; `v1.1.0` changed from Pre-release to Latest Release and notes updated.
+- Follow-up/risk: Latest status does not change the assets' ad-hoc signature or lack of Apple notarization. Asset names and release notes continue to state this limitation. The published `v1.1.0` tag remains immutable at `11227ce`; future release tags must include the documentation, license, and publisher updates now on the default branch.
