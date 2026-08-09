@@ -29,7 +29,16 @@ final class LabelTemplateStore: ObservableObject {
         templates.first(where: { $0.id == selectedTemplateID }) ?? LabelTemplate.defaultTemplate
     }
 
-    func save(name: String, widthMm: Double?, heightMm: Double?, gapMm: Double?) -> String? {
+    func save(
+        name: String,
+        widthMm: Double?,
+        heightMm: Double?,
+        gapMm: Double?,
+        title: String,
+        footer: String,
+        customNote: String,
+        enabledFields: [LabelField]
+    ) -> String? {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return "Enter a template name." }
         guard let widthMm, (20...80).contains(widthMm) else { return "Width must be between 20 and 80 mm." }
@@ -37,12 +46,17 @@ final class LabelTemplateStore: ObservableObject {
         guard let gapMm, (0...10).contains(gapMm) else { return "Gap must be between 0 and 10 mm." }
 
         let existing = selectedTemplate
+        guard !enabledFields.isEmpty else { return "Select at least one print field." }
         let template = LabelTemplate(
             id: existing.isBuiltIn ? "custom-\(UUID().uuidString)" : existing.id,
             name: trimmedName,
             widthMm: widthMm,
             heightMm: heightMm,
-            gapMm: gapMm
+            gapMm: gapMm,
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            footer: footer.trimmingCharacters(in: .whitespacesAndNewlines),
+            customNote: customNote.trimmingCharacters(in: .whitespacesAndNewlines),
+            enabledFields: enabledFields
         )
         if let index = templates.firstIndex(where: { $0.id == template.id }) {
             templates[index] = template

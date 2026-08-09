@@ -1,47 +1,26 @@
-# Pomfort Silverstack 路径管理与 Relink 重新链接标准手册
+# Silverstack 中的路径变更与重新链接
 
-在专业 DIT（数字影像技术员）现场流程中，保持卡卷数据在文件系统与 Silverstack 数据库之间的哈希一致性（XXHash / MD5 校验和绑定）是最高准则。
+这份说明只适用于已经完成拷贝、而目的地文件夹后来需要改名的情况。DIT Renamer 的设计场景是在拷贝开始前改卷名；只要流程允许，应优先在拷贝前完成卷名确认，避免改变 Silverstack 已记录的目的地路径。
 
----
+## 为什么改名会影响 Silverstack
 
-## 🚫 为什么不建议在拷贝完成后手动改名？
+Silverstack 会保存源和目的地的路径、素材信息以及校验结果。直接在 Finder 中改目的地文件夹名后，数据库中的旧路径就不再存在，相关素材可能显示为离线。改名本身不会改变素材内容，但会改变 Silverstack 查找素材的路径。
 
-一旦您在 Silverstack 中完成了从相机卡到备份硬盘（如 RAID、SSD 阵列）的拷贝，**文件在硬盘上的绝对路径将被固化写入数据库**。
-如果您直接在 macOS 访达（Finder）中修改文件夹名字，会导致以下后果：
-1. **数据库断链**：Silverstack 内部对应卡卷图标变红，提示 **Missing Resources（丢失资源）**。
-2. **校验报告失效**：制片人与后期部门无法确认该文件夹内的数据是否为经校验的原始素材。
+## 已完成拷贝时的处理方法
 
----
+1. 确认没有任务正在读取或写入目标文件夹。
+2. 在 Finder 中修改文件夹名称，并记下新的完整路径。
+3. 在 Silverstack 的 Library 中找到显示为离线的卷或 Bin。
+4. 选择 `Relink...`，将路径指向新的文件夹。
+5. 按当前 Silverstack 版本提供的选项替换丢失的资源路径；完成后运行文件验证。
+6. 确认卷恢复在线，并检查报告中的素材数量、路径和校验状态。
 
-## 🛠️ 标准补救流程：已备份文件夹改名与重新链接 (Relink Wizard)
+菜单名称会随 Silverstack 版本变化。发布前请以现场安装版本的帮助文档为准。不要把“重新链接成功”当成新的拷贝校验；如果素材发生过移动或改名，仍应使用 Silverstack 的验证功能重新确认。
 
-如现场发生突发状况，确实必须对已经完成备份的文件夹重新命名，请严格按以下步骤操作：
+## 使用路径模板减少返工
 
-### 第一步：在 macOS 访达 (Finder) 中修改文件夹名称
-1. 确保目前没有在进行任何向该文件夹写入或读取的拷贝任务。
-2. 在访达中，将目标文件夹名称修改为正确的新名称（如 `A001_C001_0701Z_CANON`）。
+在 Silverstack 的 Offload 工作流中，可以用 Path Wildcards 根据项目、机位、卷号或 Bin 名生成目的地路径。先在测试项目中确认模板输出，再用于现场。模板决定的是备份目的地的文件夹组织方式，不会改变摄影机卡内的原始目录和素材文件名。
 
-### 第二步：使用 Silverstack 重新链接向导
-1. 返回 Silverstack 软件界面。
-2. 在左侧 **Library Outline（工程目录库）** 中，找到对应已变红（离线）的卡卷/Bin。
-3. **右键点击**该目录，选择 **"Relink..."（重新链接）**，或通过顶部菜单栏选择 `Media` -> `Relink`。
-4. 在弹出的 **Relink Wizard（重新链接向导）** 窗口中，点击浏览按钮，**指向您刚刚在访达里改好名字的新文件夹**。
-5. **关键选项勾选（千万不能漏）**：
-   - ☑️ **Replace missing resources**（替换丢失的资源路径）：用新路径完全替换旧路径，避免产生冗余记录。
-   - ☑️ **Verify files after relink**（重新链接后验证文件）：**强烈建议勾选**。后台将对新路径下的素材执行快速哈希校验，确保改名及链接移动过程中素材毫发无损。
-6. 点击确认，等待进度条完成。卡卷图标将恢复为绿色在线状态，且对应的校验报告依然完整合法。
+DIT Renamer 只修改已确认卷的 macOS volume label。它不改卡内素材、不复制素材，也不执行 Silverstack 的 checksum 校验。
 
----
-
-## 💡 DIT 现场自动化避坑的最佳实践 (Path Wildcards)
-
-为了彻底避免“拷贝完了才发现名字不对需要修改”的现场隐患，行业标准做法是**“前置命名自动化”**：
-
-1. 打开 Silverstack 的 **Offload Wizard（卸载向导）**。
-2. 在目标路径（Destination Path）设置页中，不要手动敲写静态文件夹名。
-3. 使用 **Path Wildcards（路径通配符/变量）**：
-   - 常用组合例如：`[Shooting Day]_[Camera]_[Roll Name]` 或 `[Bin Name]`。
-   - 设置后，只要您在主界面新建了卡卷目录（如 Bin: `A001`），点击拷贝的瞬间，Silverstack 会自动在目标硬盘上按照通配符公式**精密度无误地创建标准文件夹**。
-
----
-*本文档为 DIT Renamer 项目内置标准业务指南，协助 DIT 规范现场交付数据流。*
+参考：[Silverstack Offload Menu](https://kb.pomfort.com/silverstack/reference/library/offload-menu/)、[File Renaming on Offload](https://kb.pomfort.com/silverstack/hands-on/managing-data/file-renaming-on-offload/)、[Path Wildcards](https://kb.pomfort.com/silverstack/reference/workflow-configuration/path-wildcards/)。

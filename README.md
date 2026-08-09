@@ -1,81 +1,101 @@
 # DIT Renamer 1.1.1
 
-DIT Renamer 是基于 Swift 构建的 macOS 现场 DIT 工具，用于识别可移除摄影机媒体、生成卷名建议并记录重命名审计信息。
+DIT Renamer 是一款原生 macOS 工具，帮助 DIT 在拷贝开始前识别摄影机卡、确认卷名，并为每次重命名留下记录。它只修改 macOS 显示的卷名，不改卡内目录或素材文件。
 
-**下载当前版本：[DIT Renamer 1.1.1 Release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
+**[下载最新版本](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
-## 首次安装（macOS）
+## 首次安装
 
-1. 从 [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest) 下载 DMG，并使用 `SHA256SUMS.txt` 校验下载的 DMG 或 ZIP。
-2. 双击 DMG。在打开的窗口中，将 `DIT Renamer.app` 拖到旁边的 `Applications` 快捷方式上；不要把 App 放在 DMG 内，也不要从下载目录直接长期运行。
-3. 从 `/Applications/DIT Renamer.app` 启动。由于当前版本没有 Developer ID 和 notarization，macOS 可能第一次阻止启动；此时打开“系统设置 > 隐私与安全性”，确认 DIT Renamer 后选择“仍要打开”。
-4. 首次启动完成后，应用会在原安装路径检查更新。以后更新由 Sparkle 替换原 App 并重启，不需要再次拖拽 App。
-5. 首次接入摄影机卡前，先停止 Silverstack、Finder 和其他会访问该卡的程序，并在可丢弃测试卡上确认现场流程。应用会强制卸载并重挂载重命名后的卡。
+1. 从 [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest) 下载 DMG。需要核对下载时，可使用同一发布页中的 `SHA256SUMS.txt`。
+2. 打开 DMG，将 `DIT Renamer.app` 拖到旁边的 `Applications` 快捷方式。
+3. 从 `/Applications/DIT Renamer.app` 启动。当前发布包没有 Developer ID 签名和 Apple 公证，macOS 可能在首次启动时阻止打开。此时前往“系统设置 > 隐私与安全性”，找到 DIT Renamer 并选择“仍要打开”。
+4. 后续版本可由应用内更新直接替换。更新完成后只需重新启动，不必再次拖拽 App。
 
-当前免费发布包是 universal ad-hoc 测试版，不保证在所有 macOS 设备上绕过 Gatekeeper。项目不提供 `sudo xattr`、隔离属性清除或绕过 Gatekeeper 的脚本。
+当前发布包是 universal ad-hoc 构建，支持 Apple Silicon 和 Intel Mac。项目不提供 `sudo xattr`、清除隔离属性或绕过 Gatekeeper 的脚本。
 
-## 运行边界
+## 主要功能
 
-- 只处理 macOS 报告为可移除且非内置的已挂载卷。
-- 在重命名前复核挂载路径、BSD 分区节点、Volume UUID，并在可用时复核 Media UUID。
-- 重命名成功后仅针对已复核的同一 BSD 分区执行强制卸载、重挂载和 UUID/卷名复核；操作前必须停止会持续访问该卷的任务。
-- 未完成扫描、未识别媒体、空卡、照片卡、未配置机位或残留旧素材不会进入自动重命名队列。
-- 所有自动命名都应视为建议；厂商目录结构和机型证据不足时必须人工确认。
+- 只读扫描可移除摄影机媒体，并根据目录、素材名和可用元数据给出卷名建议。
+- 允许人工调整机位、卷号、卡片复用次数，并选择是否保留检测到的 suffix。
+- 对 FAT、MS-DOS 和 exFAT 卷名执行 11 字符上限，不会静默截断输入。
+- 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
+- 优先从 Sony XML/XMP 读取具体机型；需要时可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
+- 保存原卷名、新卷名、UUID、BSD 节点、首末素材和操作时间。
+- 只读解析 ParaShoot 日志，并按软件当前语言导出中文或英文 PDF。`missingFiles: 0` 显示为“校验通过”；路径明确匹配时，可选择加入高置信度关联详情。
+- 为检测到的 ARRIRAW 内容提供 HDE 容量参考。结果是估算值，不代表最终编码容量。
+- 启动时检查更新；只有发现新版本才显示提示，重命名或重挂载期间不会安装更新。
 
-### 在线更新（免费 ad-hoc 模式）
+DIT Printer 是独立组件，不包含在 DIT Renamer 1.1.1 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
 
-应用内置 Sparkle 2.9.5。首次安装需要用户将 `DIT Renamer.app` 放入 `/Applications` 或 `~/Applications` 并允许 macOS 打开一次；后续启动时会后台检查 GitHub Pages 的 appcast，只有发现更新才显示提示。用户点击更新后，Sparkle 会在原路径验证并替换整个 App，完成后用户只需点击重新启动，不需要再次拖拽 App。
+## 使用边界
 
-更新归档使用 EdDSA 签名，更新不会在卷重命名、强制卸载或重挂载事务中安装，更新后还会验证目标版本；失败时保留旧版本。
+- 只显示 macOS 标记为可移除、非内置且已经挂载的卷。
+- Apple Disk Image Media、网络卷和系统虚拟卷始终排除。
+- 扫描不完整、媒体无法识别、卡为空、只有照片、机位未配置或存在残留素材时，不进入自动重命名队列。
+- `Untitled` 是 Sony FX3/FX6 等设备可能使用的默认卷名，不应直接用于备份盘。本软件处理的是摄影机卡，不负责为名为 `Untitled` 的备份盘提供服务。
+- 卷名建议始终需要现场人员判断。厂商结构或机型证据不足时，应保留原卷名或手动输入。
 
-无 Developer ID 时，后续替换流程可以工作，但 Gatekeeper 仍可能要求用户手动允许打开；这不是 Sparkle EdDSA 能消除的限制。
+重命名前，停止 Silverstack、Finder 以及其他正在访问目标卡的任务。拔卡、换卡或设备节点变化后，应重新选择并扫描。先在可丢弃测试卡上验证工作流，再用于正式素材。
 
-## 现场提示
-
-重命名是卷级元数据操作。执行前应停止会持续访问该卷的拷贝、校验或媒体管理任务；程序自身不会替现场人员判断 Silverstack、Finder 或其他进程是否仍在使用媒体。拔卡、换卡或设备节点变化后，必须重新选择并扫描卷。
-
-厂商命名规则、媒体结构和同类软件能力的核对结果见 [`docs/research_swift_1.1_vendor_rules.md`](docs/research_swift_1.1_vendor_rules.md)。
+DIT Renamer 不复制素材，不执行传输 checksum 校验，也不擦除卡片。厂商命名规则和同类软件对比见 [摄影机媒体命名研究](docs/research_swift_1.1_vendor_rules.md)。
 
 ## 许可证与署名
 
-Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE) 发布，原始发布者与官方来源记录在 [NOTICE](NOTICE) 中。
+Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE)，原始发布者与来源记录在 [NOTICE](NOTICE) 中。
 
-允许个人及商业使用、修改和再分发，但分发源码或二进制及其衍生版本时必须遵守 Apache-2.0，包括保留许可证、相关版权声明和 NOTICE 中的 DIT247 原始发布者信息，并对修改过的文件作出说明。本许可证不授予第三方冒充官方版本或超出合理来源说明范围使用 DIT247 名称与产品标识的权利。
+允许个人和商业使用、修改及再分发。分发源码、二进制或衍生版本时，必须保留许可证、相关版权声明和 `NOTICE` 中的 DIT247 原始发布者信息，并说明修改内容。许可证不允许第三方把衍生版本表述为 DIT247 官方发布，或以超出合理来源说明的方式使用 DIT Renamer 名称与标识。
 
 ---
 
 # DIT Renamer 1.1.1
 
-DIT Renamer is a native Swift macOS DIT tool for identifying removable camera media before copying begins, suggesting volume names, and recording rename audit data.
+DIT Renamer is a native macOS utility that helps DITs identify camera cards, confirm volume names, and keep a record of every rename before offload begins. It changes the macOS volume name only; folders and clips on the card remain untouched.
 
-**Download the current version: [DIT Renamer 1.1.1 Release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
+**[Download the latest release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
-## First Installation on macOS
+## First installation
 
-1. Download the DMG from the [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest), then verify the downloaded DMG or ZIP with `SHA256SUMS.txt`.
-2. Open the DMG. In the window that appears, drag `DIT Renamer.app` onto the `Applications` shortcut. Do not leave the app inside the DMG or run it permanently from Downloads.
-3. Launch `/Applications/DIT Renamer.app`. Because this release is not signed with Developer ID and is not notarized, macOS may block the first launch. Open **System Settings > Privacy & Security**, locate the DIT Renamer notice, and choose **Open Anyway**.
-4. After the first launch, the app checks for updates from its installed location. Later Sparkle updates replace the existing app in place and restart it; no further drag-and-drop is required.
-5. Before using a camera card, stop Silverstack, Finder, and any other process accessing the card. Test the workflow with a disposable card first. The app force-unmounts and remounts a card after a successful rename.
+1. Download the DMG from [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest). Use `SHA256SUMS.txt` from the same page if you need to verify the download.
+2. Open the DMG and drag `DIT Renamer.app` onto the `Applications` shortcut.
+3. Launch `/Applications/DIT Renamer.app`. This release is not signed with Developer ID or notarized by Apple, so macOS may block the first launch. Open **System Settings > Privacy & Security**, find DIT Renamer, and choose **Open Anyway**.
+4. Later releases can update the installed app in place. When an update finishes, restart the app; no further drag-and-drop installation is required.
 
-The current free package is a universal ad-hoc test release. Gatekeeper may still require manual approval. The project does not provide `sudo xattr`, quarantine-clearing, or Gatekeeper-bypass scripts.
+The current package is a universal ad-hoc build for Apple Silicon and Intel Macs. This project does not provide `sudo xattr`, quarantine-removal, or Gatekeeper-bypass scripts.
 
-## Scope and Safety
+## What it does
 
-- Only mounted volumes reported by macOS as removable and non-internal are considered.
-- Before renaming, the app rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available.
-- After a successful rename, it force-unmounts and remounts only the verified partition, then checks its UUID, name, and mount point.
-- Incomplete scans, unidentified media, empty cards, photo cards, unconfigured cameras, and cards with residual material are excluded from automatic renaming.
-- Automatic names are suggestions. Camera directory evidence and model evidence must be reviewed by the operator when incomplete.
+- Scans removable camera media without changing card contents, then suggests a volume name from folder, clip-name, and metadata evidence.
+- Lets the operator adjust camera ID, roll number, card reuse count, and whether to keep a detected suffix.
+- Enforces the 11-character FAT, MS-DOS, and exFAT volume-name limit without silently shortening input.
+- Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
+- Reads Sony XML/XMP metadata first. Optional exiftool detection can inspect one representative clip when needed and can be disabled in Settings.
+- Records original and new names, UUIDs, BSD node, first and last clips, and operation time.
+- Reads ParaShoot logs without modifying them and exports a Chinese or English PDF to match the app language. `missingFiles: 0` is shown as **Verification passed**; exact path matches can be included as optional high-confidence association details.
+- Provides an HDE capacity reference for detected ARRIRAW media. The result is an estimate, not a promised encoded size.
+- Checks for updates at launch and only prompts when a newer release is available. Updates are not installed during rename or remount operations.
 
-## License and Attribution
+DIT Printer is a separate component and is not included in DIT Renamer 1.1.1. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
 
-Copyright 2026 DIT247. The project is released under the [Apache License 2.0](LICENSE). Original publisher and source attribution are recorded in [NOTICE](NOTICE).
+## Operating limits
 
-Personal and commercial use, modification, and redistribution are allowed under Apache-2.0. Distributed source or binary derivatives must retain the license, copyright notices, and DIT247 attribution in `NOTICE`, and must identify modified files. The license does not grant permission to present a derivative as an official DIT247 release or to misuse the DIT Renamer name and marks.
+- Only mounted volumes reported by macOS as removable and non-internal are shown.
+- Apple Disk Image Media, network volumes, and system virtual volumes are always excluded.
+- Incomplete scans, unidentified media, empty cards, photo-only cards, unconfigured camera IDs, and cards with residual material do not enter the automatic rename queue.
+- `Untitled` may be the default volume name on cameras including the Sony FX3 and FX6. It should not be used as a backup-volume name; backup drives named `Untitled` are outside this application's scope.
+- Every suggested name remains an operator decision. Keep the existing name or enter one manually when vendor or model evidence is incomplete.
 
-## 开发说明 / Development Note
+Before renaming, stop Silverstack, Finder, and any other process using the card. Select and scan again after a card is removed, replaced, or assigned a different device node. Test the workflow with a disposable card before using production media.
 
-本项目大部分功能性代码由 AI 完成。
+DIT Renamer does not copy clips, verify transfers, or erase cards. See [Camera Media Naming Research](docs/research_swift_1.1_vendor_rules.md) for vendor naming sources and workflow comparisons.
 
-Most functional code in this project was built with assistance from AI.
+## License and attribution
+
+Copyright 2026 DIT247. Released under the [Apache License 2.0](LICENSE), with original publisher and source attribution in [NOTICE](NOTICE).
+
+Personal and commercial use, modification, and redistribution are permitted. Source, binary, and derivative distributions must retain the license, applicable copyright notices, and DIT247 attribution in `NOTICE`, and must identify modifications. The license does not allow a derivative to be presented as an official DIT247 release or to misuse the DIT Renamer name and marks.
+
+## 开发说明 / Development note
+
+本项目大部分功能性代码由 AI 协助完成。
+
+Most functional code in this project was built with AI assistance.

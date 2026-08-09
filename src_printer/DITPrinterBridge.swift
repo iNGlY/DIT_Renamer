@@ -6,6 +6,7 @@ private struct IncomingManifest: Decodable {
     let lastAssetName: String
     let copyCompletedAt: Date
     let sourceVolumePath: String?
+    let signalSource: String?
 
     enum CodingKeys: String, CodingKey {
         case jobID = "job_id"
@@ -13,6 +14,7 @@ private struct IncomingManifest: Decodable {
         case lastAssetName = "last_asset_name"
         case copyCompletedAt = "copy_completed_at"
         case sourceVolumePath = "source_volume_path"
+        case signalSource = "signal_source"
     }
 }
 
@@ -92,7 +94,9 @@ struct DITPrinterBridge {
                 binName: manifest.binName,
                 lastAssetName: manifest.lastAssetName,
                 copyCompletedAt: manifest.copyCompletedAt,
-                renamerAudit: RenamerAuditReader.latestMatch(sourceVolumePath: manifest.sourceVolumePath)
+                renamerAudit: RenamerAuditReader.latestMatch(sourceVolumePath: manifest.sourceVolumePath),
+                signalSource: manifest.signalSource ?? "Silverstack Copy Job (Verify Included)",
+                sourceVolumePath: manifest.sourceVolumePath
             )
             let destination = try job.fileURL()
             if !FileManager.default.fileExists(atPath: destination.path) {

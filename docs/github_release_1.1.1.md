@@ -5,7 +5,7 @@
 - Git 标签：`v1.1.1`
 - GitHub Release 标题：`DIT Renamer 1.1.1`
 - 当前构建是 universal（arm64 + x86_64）的 Swift 应用，包含 Sparkle 2.9.5 在线更新支持。
-- 没有 Developer ID 时，只能发布明确标注 `adhoc-unnotarized` 的测试/预发布资产；不得描述为已公证或 Gatekeeper 验证通过。
+- 当前资产明确标注为 `adhoc-unnotarized`。发布说明必须写明没有 Developer ID、公证票据或 Gatekeeper 验证，不得把它描述为 Apple 已验证的分发版本。
 - 发布前必须先上传 Release 资产，再将生成后的 `appcast.xml` 发布到 GitHub Pages，避免客户端访问不存在的更新归档。
 
 ## 本版本内容
@@ -65,5 +65,4 @@ scripts/generate_appcast.sh Release
 scripts/publish_github_release.sh
 ```
 
-无 Developer ID 时请将 GitHub Release 标为预发布，直到获得 Developer ID、完成 notarization、staple 和 Gatekeeper 实机验证。
-
+当前项目决定将 ad-hoc 构建作为 Latest Release 发布。发布页和 README 必须继续保留首次启动步骤及 Gatekeeper 限制；将来取得 Developer ID 后，再改用 notarization、staple 和 Gatekeeper 实机验证流程。

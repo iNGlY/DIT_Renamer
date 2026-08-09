@@ -61,7 +61,7 @@ struct SidebarView: View {
                     Text(langManager.text("符合条件自动改名", "Auto-Rename Queue"))
                         .font(.caption)
                         .fontWeight(.semibold)
-                    Text(langManager.text("符合卷名检测自动重命名", "Auto rename compliant volumes"))
+                    Text(langManager.text("符合条件的卷会自动进入队列", "Queue volumes that meet the rename rules"))
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -87,7 +87,7 @@ struct SidebarView: View {
             List {
                 if sidebarTab == 0 {
                     if recommendedVolumes.isEmpty && otherVolumes.isEmpty {
-                        Text(langManager.text("未检测到有效卡片", "No Volumes Detected"))
+                            Text(langManager.text("未检测到可处理的卷", "No eligible volumes detected"))
                             .foregroundColor(.secondary)
                             .font(.caption)
                     } else {

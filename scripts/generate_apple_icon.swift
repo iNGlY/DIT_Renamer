@@ -7,7 +7,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     image.lockFocus()
     guard let ctx = NSGraphicsContext.current?.cgContext else { return image }
     
-    // 1. Background Squircle
+    // Background
     let squirclePath = NSBezierPath(roundedRect: NSRect(x: 32, y: 32, width: 448, height: 448), xRadius: 100, yRadius: 100)
     
     if isDark {
@@ -24,7 +24,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     squirclePath.lineWidth = 3
     squirclePath.stroke()
     
-    // 2. Draw Precision Background Grid (在背后加入网格)
+    // Background grid
     ctx.saveGState()
     squirclePath.addClip()
     
@@ -46,7 +46,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     gridPath.stroke()
     ctx.restoreGState()
     
-    // 3. Draw Straight Upright Memory Card (把卡放正)
+    // Memory card
     ctx.saveGState()
     ctx.translateBy(x: 256, y: 235)
     
@@ -56,7 +56,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     shadow.shadowBlurRadius = 18
     shadow.set()
     
-    // Card Body (Straight)
+    // Card body
     let cardRect = NSRect(x: -105, y: -135, width: 210, height: 270)
     let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: 16, yRadius: 16)
     
@@ -82,7 +82,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     NSColor.white.setFill()
     labelPath.fill()
     
-    // Label Text "A001"
+    // Label text
     let textStr = "A001"
     let font = NSFont.monospacedSystemFont(ofSize: 40, weight: .bold)
     let attrs: [NSAttributedString.Key: Any] = [
@@ -115,7 +115,7 @@ func renderIcon(isDark: Bool) -> NSImage {
     
     ctx.restoreGState()
     
-    // 4. Apple Pencil (Angle Pointing to Label)
+    // Pencil
     ctx.saveGState()
     ctx.translateBy(x: 350, y: 330)
     ctx.rotate(by: -0.55)
@@ -153,19 +153,27 @@ func renderIcon(isDark: Bool) -> NSImage {
     return image
 }
 
-// Render Light and Dark Mode Icons
 let lightIcon = renderIcon(isDark: false)
 let darkIcon = renderIcon(isDark: true)
+
+let outputDirectory = CommandLine.arguments.dropFirst().first
+    .map { URL(fileURLWithPath: $0, isDirectory: true) }
+    ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
 
 func savePNG(_ image: NSImage, filename: String) {
     if let tiffData = image.tiffRepresentation,
        let bitmap = NSBitmapImageRep(data: tiffData),
        let pngData = bitmap.representation(using: .png, properties: [:]) {
-        let url = URL(fileURLWithPath: "/Users/Do2n4c7rY/.gemini/antigravity-ide/brain/b38a126b-6315-4eb3-bb93-8d4856376c5c/\(filename)")
-        try? pngData.write(to: url)
+        let url = outputDirectory.appendingPathComponent(filename)
+        do {
+            try pngData.write(to: url)
+        } catch {
+            fputs("Could not write \(url.path): \(error)\n", stderr)
+            exit(1)
+        }
     }
 }
 
 savePNG(lightIcon, filename: "apple_icon_light_grid.png")
 savePNG(darkIcon, filename: "apple_icon_dark_grid.png")
-print("BOTH LIGHT AND DARK GRID ICONS RENDERED SUCCESSFULLY!")
+print("Created light and dark icon PNGs in \(outputDirectory.path)")

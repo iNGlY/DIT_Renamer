@@ -24,7 +24,11 @@ enum LabelRendererSmokeTest {
             guard label.suffix(13) == Data("\r\nPRINT 1,1\r\n".utf8) else {
                 fatalError("Missing expected TSPL print command")
             }
-            print("TSPL label smoke test passed: default=\(label.count), custom=\(compactLabel.count) bytes")
+            let pdf = try TSPLLabelRenderer.pdfData(job: job)
+            guard String(data: pdf.prefix(4), encoding: .ascii) == "%PDF" else {
+                fatalError("PDF label rendering did not produce a PDF document")
+            }
+            print("Label renderer smoke test passed: TSPL=\(label.count), custom=\(compactLabel.count), PDF=\(pdf.count) bytes")
         } catch {
             fatalError("TSPL label smoke test failed: \(error.localizedDescription)")
         }

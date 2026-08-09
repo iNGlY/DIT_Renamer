@@ -104,7 +104,7 @@ struct MainDetailView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "tray")
                             .foregroundColor(.gray)
-                        Text(langManager.text("此存储卡为空卡（无任何媒体文件），已自动保护停止重命名。", "Empty volume detected (No media files). Protected from automatic renaming."))
+                        Text(langManager.text("这张卡中没有媒体文件，自动重命名已关闭。", "No media files were found on this card. Automatic renaming is disabled."))
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
@@ -177,13 +177,13 @@ struct MainDetailView: View {
                         .cornerRadius(10)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                         
-                        // AI Suggestion Box
+                        // Read-only scan summary
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "sparkles")
                                         .foregroundColor(.blue)
-                                    Text("\(langManager.text("AI 素材结构推演", "AI Media Structure Inference")) (\(scanResult?.deviceType ?? "Generic"))")
+                                    Text("\(langManager.text("素材结构分析", "Media Structure")) (\(scanResult?.deviceType ?? "Generic"))")
                                         .font(.caption)
                                         .fontWeight(.bold)
                                         .foregroundColor(.blue)
@@ -212,14 +212,14 @@ struct MainDetailView: View {
                         .cornerRadius(10)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blue.opacity(0.3), lineWidth: 1))
                         
-                        // Codex HDE Compression Engine Box
+                        // HDE reference estimate
                         if let hde = scanResult?.hdeResult, hde.isHDESupported {
                             HDEInfoCardView(hde: hde, usedGBFormatted: vol.usedGBFormatted)
                         }
                         
                         // Manual Controls
                         VStack(alignment: .leading, spacing: 10) {
-                            Text(langManager.text("参数手动微调", "MANUAL PARAMETERS"))
+                            Text(langManager.text("手动调整卷名", "Adjust Volume Name"))
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
@@ -291,9 +291,9 @@ struct MainDetailView: View {
                         .cornerRadius(10)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                         
-                        // Enhanced Live Preview Box (所见即所得预览)
+                        // Volume-name preview
                         VStack(spacing: 4) {
-                            Text(langManager.text("所见即所得预览 (LIVE PREVIEW)", "LIVE PREVIEW"))
+                            Text(langManager.text("卷名预览", "Volume Name Preview"))
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
@@ -325,7 +325,7 @@ struct MainDetailView: View {
                                 } else {
                                     Image(systemName: "pencil.and.outline")
                                 }
-                                Text(langManager.text("执行标准重命名", "Execute Standard Rename"))
+                                Text(langManager.text("重命名卷", "Rename Volume"))
                                     .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)
@@ -535,7 +535,7 @@ struct HDEInfoCardView: View {
             HStack {
                 Image(systemName: "cpu.fill")
                     .foregroundColor(.purple)
-                Text(langManager.text("Codex HDE 无损压缩容量推演", "Codex HDE Storage Calculation"))
+                Text(langManager.text("Codex HDE 容量参考", "Codex HDE Capacity Reference"))
                     .font(.caption)
                     .fontWeight(.bold)
                     .foregroundColor(.purple)
@@ -544,7 +544,7 @@ struct HDEInfoCardView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 10))
-                        Text(langManager.text("Codex HDE CLI 命令行加持", "Codex HDE CLI Engine"))
+                        Text(langManager.text("Codex HDE CLI", "Codex HDE CLI"))
                             .font(.system(size: 9, weight: .bold))
                     }
                     .padding(.horizontal, 6)
@@ -553,7 +553,7 @@ struct HDEInfoCardView: View {
                     .foregroundColor(.purple)
                     .cornerRadius(4)
                 } else {
-                    Text(langManager.text("Codex HDE 官方模型推演", "Codex HDE Lossless Model"))
+                    Text(langManager.text("基于模型的参考值", "Model-based reference"))
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.purple.opacity(0.8))
                 }
@@ -638,8 +638,8 @@ struct UnconfiguredCameraBannerView: View {
             Image(systemName: "exclamationmark.shield.fill")
                 .foregroundColor(.orange)
             let msg = langManager.text(
-                "检测到摄影机未设置机位号 (默认 C0001 格式)，已拦截自动重命名。请在摄影机内补全机位，或在右侧面板手动确认。",
-                "Unconfigured Camera ID detected (Default C0001). Auto-rename blocked. Please set Camera ID in camera or confirm manually in right panel."
+                "素材名仍是默认的 C0001 格式，无法确认机位。请在摄影机中设置机位，或在这里手动确认卷名。",
+                "The clip name still uses the default C0001 pattern, so the camera ID cannot be confirmed. Set it in the camera or confirm the volume name manually."
             )
             Text(msg)
                 .font(.caption)
@@ -697,8 +697,8 @@ struct PhotoCardBannerView: View {
             Image(systemName: "camera.fill")
                 .foregroundColor(.purple)
             let msg = langManager.text(
-                "检测到平面照片卡 (含 \(photoCount) 张照片，无视频)，已自动保护。",
-                "Photo-only volume detected (Contains \(photoCount) photos, no video). Auto-rename bypassed."
+                "这张卡包含 \(photoCount) 张照片，没有视频；自动重命名已关闭。",
+                "This card contains \(photoCount) photos and no video. Automatic renaming is disabled."
             )
             Text(msg)
                 .font(.caption)

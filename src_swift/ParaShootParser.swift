@@ -69,7 +69,7 @@ public class ParaShootParser: ObservableObject {
     private func startWatching() {
         let logDir = logPath.deletingLastPathComponent()
         
-        // 1. Watch Directory for file creation/replacement
+        // Watch for newly created or replaced log files.
         directoryDescriptor = open(logDir.path, O_EVTONLY)
         if directoryDescriptor >= 0 {
             let dirSource = DispatchSource.makeFileSystemObjectSource(
@@ -87,7 +87,7 @@ public class ParaShootParser: ObservableObject {
         
         rebindFileWatcher()
         
-        // 2. Real-time polling fallback (2.0s) to guarantee zero-latency updates
+        // Poll as a fallback when filesystem events are unavailable.
         DispatchQueue.main.async {
             self.pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
                 self?.reloadLogs()

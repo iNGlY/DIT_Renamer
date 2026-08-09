@@ -83,7 +83,7 @@ public class MediaScanner {
                     if ext == "nev" { hasNev = true }
                     if ext == "r3d" { hasR3d = true }
                     
-                    // Hardware-level binary MXF header inspection for ARRIRAW vs ProRes distinction
+                    // Inspect the MXF header to distinguish ARRIRAW from ProRes.
                     let isRaw = MediaScanner.isARRIRAWFile(fileURL: fileURL)
                     if isRaw {
                         hasAri = true
@@ -208,7 +208,7 @@ public class MediaScanner {
                 )
             }
             
-            // B. Sony FX Cinema (FX3 / FX6 / FX9 / VENICE) Pattern (e.g. B003C026_2001184O.MP4)
+            // B. Observed Sony cinema-style pattern. Metadata is still required for the model.
             let sonyFxRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})[CR]\\d{3}_", options: [])
             if let match = sonyFxRegex?.firstMatch(in: first, options: [], range: range) {
                 let camera = String(first[Range(match.range(at: 1), in: first)!])
@@ -230,7 +230,7 @@ public class MediaScanner {
             }
             
             // C. Nikon ZR / Z Cinema Pattern (e.g. A001_C018_0731IT.MOV / .R3D / .NEV)
-            // Format: CamID (1) + Roll (3) + _C + Clip (3) + _ + MMDD (4) + Hash (2)
+            // Observed shape: camera ID, roll, clip number, date, and a short suffix.
             let nikonZrRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_C\\d{3}_(\\d{4})([A-Z0-9]{2})", options: [])
             if let match = nikonZrRegex?.firstMatch(in: first, options: [], range: range) {
                 let camera = String(first[Range(match.range(at: 1), in: first)!])
@@ -285,7 +285,7 @@ public class MediaScanner {
                 )
             }
             
-            // E. ARRI / Canon / Generic Standard Cinema Pattern with Underscore (e.g. A001_C001_07143X.MOV)
+            // E. Generic cinema-style pattern. It is not a vendor or model proof.
             let standardCinemaRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_", options: [])
             if let match = standardCinemaRegex?.firstMatch(in: first, options: [], range: range) {
                 let camera = String(first[Range(match.range(at: 1), in: first)!])
@@ -464,7 +464,7 @@ public class MediaScanner {
             }
         }
         
-        // Fallback: Check if file follows ARRI Cinema Clip Naming convention (e.g. A001_C001_...)
+        // Fallback: look for an ARRI-style clip name as an additional hint.
         let name = fileURL.lastPathComponent
         let isArriClipPattern = name.range(of: "^[A-Z]\\d{3}_C\\d{3}_", options: .regularExpression) != nil
         return isArriClipPattern
@@ -523,7 +523,7 @@ public class HDECalculator {
             return nil
         }
         
-        // HDE lossless ARRIRAW algorithm ratio (~40% space savings -> 60% of original size)
+        // HDE reference ratio for ARRIRAW estimation.
         let rawAfterHDE = Int64(Double(rawBytesToCompress) * 0.60)
         let estimatedBytes = rawAfterHDE + uncompressibleBytes
         let savedBytes = max(0, usedBytes - estimatedBytes)

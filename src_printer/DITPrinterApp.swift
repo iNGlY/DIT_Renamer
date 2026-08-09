@@ -5,10 +5,11 @@ import SwiftUI
 struct DITPrinterApp: App {
     @StateObject private var store = PrinterJobStore()
     @StateObject private var templateStore = LabelTemplateStore()
+    @StateObject private var profileStore = PrintProfileStore()
 
     var body: some Scene {
         WindowGroup("DIT Printer") {
-            DITPrinterMainView(store: store, templateStore: templateStore)
+            DITPrinterMainView(store: store, templateStore: templateStore, profileStore: profileStore)
                 .frame(minWidth: 920, minHeight: 580)
         }
         .defaultSize(width: 980, height: 650)
@@ -21,16 +22,11 @@ final class PrinterJobStore: ObservableObject {
     @Published private(set) var jobs: [DITPrinterJob] = []
     @Published var selectedJobID: UUID?
     @Published var printerQueues: [String] = []
-    @Published var selectedQueue: String {
-        didSet { UserDefaults.standard.set(selectedQueue, forKey: Self.queueDefaultsKey) }
-    }
     @Published var isSubmitting = false
 
-    private static let queueDefaultsKey = "ditPrinter.selectedQueue"
     private var pollTimer: Timer?
 
     init() {
-        selectedQueue = UserDefaults.standard.string(forKey: Self.queueDefaultsKey) ?? ""
         refresh()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshJobs() }
@@ -74,12 +70,6 @@ final class PrinterJobStore: ObservableObject {
 
     func refreshQueues() {
         printerQueues = CUPSPrinter.availableQueues()
-        if !selectedQueue.isEmpty && !printerQueues.contains(selectedQueue) {
-            printerQueues.insert(selectedQueue, at: 0)
-        }
-        if selectedQueue.isEmpty, let firstQueue = printerQueues.first {
-            selectedQueue = firstQueue
-        }
     }
 
     func updateSelectedJob(binName: String, lastAssetName: String, reuseCount: Int?) {
@@ -90,12 +80,8 @@ final class PrinterJobStore: ObservableObject {
         persist(jobs[index])
     }
 
-    func submitSelectedJob(template: LabelTemplate) {
+    func submitSelectedJob(template: LabelTemplate, profile: PrintProfile) {
         guard let index = jobs.firstIndex(where: { $0.id == selectedJobID }) else { return }
-        guard !selectedQueue.isEmpty else {
-            markFailed(at: index, error: "No CUPS printer queue selected.")
-            return
-        }
         guard let reuseCount = jobs[index].reuseCount, reuseCount >= 0 else {
             markFailed(at: index, error: "Enter the card reuse count before printing.")
             return
@@ -103,20 +89,20 @@ final class PrinterJobStore: ObservableObject {
 
         isSubmitting = true
         jobs[index].labelTemplate = template
+        jobs[index].printProfile = profile
         jobs[index].status = .printing
         jobs[index].lastError = nil
         persist(jobs[index])
         let job = jobs[index]
-        let queue = selectedQueue
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                let reference = try CUPSPrinter.submit(job: job, queueName: queue, template: job.labelTemplate ?? template)
+                let reference = try CUPSPrinter.submit(job: job, profile: profile, template: job.labelTemplate ?? template)
                 DispatchQueue.main.async {
                     guard let self, let updatedIndex = self.jobs.firstIndex(where: { $0.id == job.id }) else { return }
                     self.jobs[updatedIndex].status = .printed
                     self.jobs[updatedIndex].printedAt = Date()
-                    self.jobs[updatedIndex].queueName = queue
+                    self.jobs[updatedIndex].queueName = profile.queueName.isEmpty ? nil : profile.queueName
                     self.jobs[updatedIndex].cupsJobReference = reference
                     self.jobs[updatedIndex].lastError = nil
                     self.isSubmitting = false
@@ -158,7 +144,10 @@ final class PrinterJobStore: ObservableObject {
 struct DITPrinterMainView: View {
     @ObservedObject var store: PrinterJobStore
     @ObservedObject var templateStore: LabelTemplateStore
+    @ObservedObject var profileStore: PrintProfileStore
     @State private var showTemplateLibrary = false
+    @State private var showProfileLibrary = false
+    @State private var historyError: String?
 
     var body: some View {
         NavigationSplitView {
@@ -176,10 +165,21 @@ struct DITPrinterMainView: View {
                     Image(systemName: "tag")
                 }
                 .help("Manage label stock templates")
+                Button { showProfileLibrary = true } label: {
+                    Image(systemName: "printer.badge.gearshape")
+                }
+                .help("Manage print profiles")
+                Menu {
+                    Button("Export CSV") { exportHistory(.csv) }
+                    Button("Export JSON") { exportHistory(.json) }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .help("Export print history")
             }
         } detail: {
             if let job = store.selectedJob {
-                JobEditor(job: job, store: store, templateStore: templateStore)
+                JobEditor(job: job, store: store, templateStore: templateStore, profileStore: profileStore)
             } else {
                 ContentUnavailableView("No print jobs", systemImage: "printer")
             }
@@ -188,6 +188,20 @@ struct DITPrinterMainView: View {
         .sheet(isPresented: $showTemplateLibrary) {
             LabelTemplateLibrary(store: templateStore)
         }
+        .sheet(isPresented: $showProfileLibrary) {
+            PrintProfileLibrary(store: profileStore, queues: store.printerQueues, refreshQueues: store.refreshQueues)
+        }
+        .alert("History export failed", isPresented: Binding(
+            get: { historyError != nil },
+            set: { if !$0 { historyError = nil } }
+        ), actions: {
+            Button("OK") { historyError = nil }
+        }, message: { Text(historyError ?? "") })
+    }
+
+    private func exportHistory(_ format: PrintHistoryFormat) {
+        do { try PrintHistoryExporter.export(store.jobs, format: format) }
+        catch { historyError = error.localizedDescription }
     }
 }
 
@@ -232,6 +246,7 @@ private struct JobEditor: View {
     let job: DITPrinterJob
     @ObservedObject var store: PrinterJobStore
     @ObservedObject var templateStore: LabelTemplateStore
+    @ObservedObject var profileStore: PrintProfileStore
     @State private var binName = ""
     @State private var lastAssetName = ""
     @State private var reuseText = ""
@@ -247,6 +262,10 @@ private struct JobEditor: View {
                 }
                 LabeledContent("Received by DIT Printer") {
                     Text(job.receivedAt.formatted(date: .abbreviated, time: .standard))
+                }
+                LabeledContent("Signal source", value: job.signalSource)
+                if let sourceVolumePath = job.sourceVolumePath {
+                    LabeledContent("Source volume", value: sourceVolumePath)
                 }
             }
 
@@ -276,16 +295,20 @@ private struct JobEditor: View {
             }
 
             Section("Printer") {
-                Picker("CUPS raw queue", selection: $store.selectedQueue) {
-                    if store.printerQueues.isEmpty {
-                        Text("No queues found").tag("")
-                    } else {
-                        ForEach(store.printerQueues, id: \.self) { Text($0).tag($0) }
+                Picker("Output profile", selection: $profileStore.selectedProfileID) {
+                    ForEach(profileStore.profiles) { profile in
+                        Text(profile.name).tag(profile.id)
                     }
                 }
-                Button("Refresh printer queues", action: store.refreshQueues)
+                LabeledContent("Output", value: profileStore.selectedProfile.outputKind.title)
+                if profileStore.selectedProfile.outputKind != .customCLI {
+                    LabeledContent("CUPS queue", value: profileStore.selectedProfile.queueName.isEmpty ? "Not configured" : profileStore.selectedProfile.queueName)
+                }
                 if let queue = job.queueName {
                     LabeledContent("Last submitted queue", value: queue)
+                }
+                if let submittedProfile = job.printProfile {
+                    LabeledContent("Last submitted profile", value: submittedProfile.name)
                 }
                 if let reference = job.cupsJobReference {
                     LabeledContent("CUPS response", value: reference)
@@ -321,7 +344,7 @@ private struct JobEditor: View {
                     .help("Preview label")
                     Button {
                         save()
-                        store.submitSelectedJob(template: templateStore.selectedTemplate)
+                        store.submitSelectedJob(template: templateStore.selectedTemplate, profile: profileStore.selectedProfile)
                     } label: {
                         Label(store.isSubmitting ? "Submitting" : "Print label", systemImage: "printer.fill")
                     }
@@ -367,6 +390,10 @@ private struct LabelTemplateLibrary: View {
     @State private var width = ""
     @State private var height = ""
     @State private var gap = ""
+    @State private var title = ""
+    @State private var footer = ""
+    @State private var customNote = ""
+    @State private var enabledFields = Set<LabelField>()
     @State private var validationError: String?
 
     var body: some View {
@@ -386,6 +413,22 @@ private struct LabelTemplateLibrary: View {
                     TextField("Gap", text: $gap)
                 }
             }
+            Section("Label text") {
+                TextField("Title", text: $title)
+                TextField("Footer", text: $footer)
+                TextField("Custom note", text: $customNote)
+            }
+            Section("Printed fields") {
+                ForEach(LabelField.allCases) { field in
+                    Toggle(field.title, isOn: Binding(
+                        get: { enabledFields.contains(field) },
+                        set: { isEnabled in
+                            if isEnabled { enabledFields.insert(field) }
+                            else { enabledFields.remove(field) }
+                        }
+                    ))
+                }
+            }
             if let validationError {
                 Section { Text(validationError).foregroundStyle(.red) }
             }
@@ -395,7 +438,11 @@ private struct LabelTemplateLibrary: View {
                         name: name,
                         widthMm: Double(width),
                         heightMm: Double(height),
-                        gapMm: Double(gap)
+                        gapMm: Double(gap),
+                        title: title,
+                        footer: footer,
+                        customNote: customNote,
+                        enabledFields: LabelField.allCases.filter { enabledFields.contains($0) }
                     )
                     loadSelectedTemplate()
                 } label: {
@@ -412,7 +459,7 @@ private struct LabelTemplateLibrary: View {
         }
         .formStyle(.grouped)
         .padding(20)
-        .frame(width: 440, height: 410)
+        .frame(width: 460, height: 650)
         .onAppear(perform: loadSelectedTemplate)
         .onChange(of: store.selectedTemplateID) { _, _ in loadSelectedTemplate() }
         .toolbar {
@@ -427,6 +474,95 @@ private struct LabelTemplateLibrary: View {
         width = String(template.widthMm)
         height = String(template.heightMm)
         gap = String(template.gapMm)
+        title = template.title
+        footer = template.footer
+        customNote = template.customNote
+        enabledFields = Set(template.enabledFields)
+        validationError = nil
+    }
+}
+
+private struct PrintProfileLibrary: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var store: PrintProfileStore
+    let queues: [String]
+    let refreshQueues: () -> Void
+    @State private var name = ""
+    @State private var outputKind: PrintOutputKind = .cupsPDF
+    @State private var queueName = ""
+    @State private var executablePath = ""
+    @State private var argumentsText = ""
+    @State private var validationError: String?
+
+    var body: some View {
+        Form {
+            Section("Print profiles") {
+                Picker("Profile", selection: $store.selectedProfileID) {
+                    ForEach(store.profiles) { profile in Text(profile.name).tag(profile.id) }
+                }
+            }
+            Section("Output") {
+                TextField("Name", text: $name)
+                Picker("Driver", selection: $outputKind) {
+                    ForEach(PrintOutputKind.allCases) { kind in Text(kind.title).tag(kind) }
+                }
+                if outputKind != .customCLI {
+                    Picker("CUPS queue", selection: $queueName) {
+                        Text("Select queue").tag("")
+                        ForEach(queues, id: \.self) { Text($0).tag($0) }
+                    }
+                    Button("Refresh CUPS queues", action: refreshQueues)
+                } else {
+                    TextField("Executable path", text: $executablePath)
+                    TextEditor(text: $argumentsText)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(height: 80)
+                    Text("One argument per line. Include {file} on one line; DIT Printer replaces it with the rendered PDF path.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let validationError { Section { Text(validationError).foregroundStyle(.red) } }
+            Section {
+                Button {
+                    validationError = store.save(
+                        name: name,
+                        outputKind: outputKind,
+                        queueName: queueName,
+                        executablePath: executablePath,
+                        argumentsText: argumentsText
+                    )
+                    loadProfile()
+                } label: {
+                    Label("Save profile", systemImage: "square.and.arrow.down")
+                }
+                Button(role: .destructive) {
+                    store.deleteSelectedCustomProfile()
+                    loadProfile()
+                } label: {
+                    Label("Delete custom profile", systemImage: "trash")
+                }
+                .disabled(store.selectedProfile.isBuiltIn)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(20)
+        .frame(width: 500, height: 520)
+        .onAppear(perform: loadProfile)
+        .onChange(of: store.selectedProfileID) { _, _ in loadProfile() }
+        .toolbar {
+            Button { dismiss() } label: { Image(systemName: "xmark") }
+                .help("Close")
+        }
+    }
+
+    private func loadProfile() {
+        let profile = store.selectedProfile
+        name = profile.name
+        outputKind = profile.outputKind
+        queueName = profile.queueName
+        executablePath = profile.executablePath
+        argumentsText = profile.arguments.joined(separator: "\n")
         validationError = nil
     }
 }

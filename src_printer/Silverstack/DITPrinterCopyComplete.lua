@@ -83,6 +83,7 @@ function onFinish(assets, resources, workingPath, success)
     if sourceVolumePath ~= nil then
         file:write("  \"source_volume_path\": \"", jsonEscape(sourceVolumePath), "\",\n")
     end
+    file:write("  \"signal_source\": \"Silverstack Copy Job complete\",\n")
     file:write("  \"copy_completed_at\": \"", now, "\"\n")
     file:write("}\n")
     file:close()

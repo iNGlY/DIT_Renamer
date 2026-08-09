@@ -1,15 +1,31 @@
 import AppKit
 
-let iconPath = "/Users/Do2n4c7rY/.gemini/antigravity-ide/brain/b38a126b-6315-4eb3-bb93-8d4856376c5c/apple_icon_dark_grid.png"
-guard let baseImage = NSImage(contentsOfFile: iconPath) else {
-    print("Failed to load base PNG")
+guard CommandLine.arguments.count >= 2 else {
+    fputs("Usage: swift scripts/make_icns.swift <source.png> [output.iconset]\n", stderr)
+    exit(2)
+}
+
+let iconURL = URL(fileURLWithPath: CommandLine.arguments[1])
+let iconsetURL = CommandLine.arguments.count >= 3
+    ? URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+    : URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        .appendingPathComponent("AppIcon.iconset", isDirectory: true)
+
+guard let baseImage = NSImage(contentsOf: iconURL) else {
+    fputs("Could not load source PNG at \(iconURL.path)\n", stderr)
     exit(1)
 }
 
 let fm = FileManager.default
-let iconsetDir = "/Users/Do2n4c7rY/Downloads/DIT_Renamer/AppIcon.iconset"
-try? fm.removeItem(atPath: iconsetDir)
-try? fm.createDirectory(atPath: iconsetDir, withIntermediateDirectories: true, attributes: nil)
+do {
+    if fm.fileExists(atPath: iconsetURL.path) {
+        try fm.removeItem(at: iconsetURL)
+    }
+    try fm.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
+} catch {
+    fputs("Could not prepare \(iconsetURL.path): \(error)\n", stderr)
+    exit(1)
+}
 
 let sizes: [(String, Int)] = [
     ("icon_16x16.png", 16),
@@ -34,9 +50,14 @@ for (filename, px) in sizes {
     if let tiffData = resized.tiffRepresentation,
        let bitmap = NSBitmapImageRep(data: tiffData),
        let pngData = bitmap.representation(using: .png, properties: [:]) {
-        let destURL = URL(fileURLWithPath: "\(iconsetDir)/\(filename)")
-        try? pngData.write(to: destURL)
+        let destURL = iconsetURL.appendingPathComponent(filename)
+        do {
+            try pngData.write(to: destURL)
+        } catch {
+            fputs("Could not write \(destURL.path): \(error)\n", stderr)
+            exit(1)
+        }
     }
 }
 
-print("ICONSET CREATED SUCCESSFULLY!")
+print("Created iconset at \(iconsetURL.path)")

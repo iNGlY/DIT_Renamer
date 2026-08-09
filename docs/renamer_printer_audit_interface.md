@@ -1,8 +1,6 @@
-# Renamer Printer Audit Interface
+# DIT Renamer Read-Only Audit Interface
 
-DIT Renamer exposes a read-only JSON snapshot for the separate DIT Printer
-extension. It is not a control channel: Printer cannot request a rename,
-unmount, remount, erase, or change Renamer history.
+DIT Renamer provides a read-only JSON snapshot for the separate DIT Printer application. This is not a control channel: Printer cannot request a rename, unmount, remount, erase, or change Renamer history.
 
 ## File location
 
@@ -10,9 +8,7 @@ unmount, remount, erase, or change Renamer history.
 ~/Library/Application Support/DITRenamer/printer_audit_v1.json
 ```
 
-Renamer rewrites the snapshot atomically after it persists a rename history
-record and when it reloads history. The file is a local audit aid, not proof of
-Silverstack copy verification.
+Renamer replaces the snapshot atomically after saving or reloading rename history. The file provides label context and an operational record; it is not proof of Silverstack copy verification.
 
 ## Schema v1
 
@@ -40,8 +36,4 @@ Silverstack copy verification.
 }
 ```
 
-`recorded_mount_path` is the pre-rename path recorded by Renamer. Printer
-matches its optional `source_volume_path` against that path and against
-`actual_name`/`requested_name` as the current mounted volume name. A match only
-fills read-only label context; it never changes the Silverstack job or creates
-permission to erase a card.
+`recorded_mount_path` is the path recorded before the rename. Printer compares its optional `source_volume_path` with that path and with `actual_name` or `requested_name` as the current mounted volume name. A match only adds read-only context to a label. It does not change a Silverstack job or grant permission to erase a card.

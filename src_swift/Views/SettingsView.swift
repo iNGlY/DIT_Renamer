@@ -47,19 +47,19 @@ struct SettingsView: View {
                 // MARK: - 1. 规则化命名摄影机排除
                 sectionCard {
                     sectionHeader(icon: "video.badge.checkmark", title: langManager.text("规则化命名摄影机排除", "Exclude Pre-Named Camera Volumes"),
-                                  subtitle: langManager.text("勾选后，已具有规则化卷名的专业摄影机存储卡将被屏蔽，不显示在侧边栏。", "When enabled, camera volumes with standardized naming conventions will be hidden from the sidebar."))
+                                  subtitle: langManager.text("勾选后，已有规范卷名的摄影机卡会从侧边栏隐藏。", "When enabled, camera cards with an established volume name are hidden from the sidebar."))
                     
                     VStack(spacing: 0) {
                         toggleRow(
                             label: langManager.text("ARRI / Sony VENICE / RED (UDF)", "ARRI / Sony VENICE / RED (UDF)"),
-                            detail: langManager.text("高端电影机常采用 UDF 格式，卷名在格式化时已按机位和卷号严格规则化生成", "High-end cinema cameras use UDF filesystem with standardized naming conventions"),
+                            detail: langManager.text("这类摄影机通常使用 UDF，卷名由摄影机在格式化时生成。", "These cameras commonly use UDF and set the volume name when the card is formatted."),
                             binding: $excludeUDF,
                             onChange: { monitor.refreshVolumes() }
                         )
                         Divider().padding(.horizontal, 12)
                         toggleRow(
                             label: langManager.text("ARRI / Codex HDE (X2XFUSE / HFS+)", "ARRI / Codex HDE (X2XFUSE / HFS+)"),
-                            detail: langManager.text("Codex Capture/Compact Drive 存储卡。Mac 上挂载为 X2XFUSE，卷名通常已规范化", "Codex Capture/Compact Drive mounts as X2XFUSE on Mac with standardized volume names"),
+                            detail: langManager.text("Codex Capture 或 Compact Drive 在 Mac 上通常挂载为 X2XFUSE。", "Codex Capture and Compact Drive media commonly mount as X2XFUSE on Mac."),
                             binding: $excludeCodex,
                             onChange: { monitor.refreshVolumes() }
                         )
@@ -71,7 +71,7 @@ struct SettingsView: View {
                 // MARK: - 2. 非摄影机格式排除
                 sectionCard {
                     sectionHeader(icon: "nosign", title: langManager.text("非摄影机格式排除", "Exclude Non-Camera Filesystems"),
-                                  subtitle: langManager.text("排除与摄影机存储无关的文件系统格式。SMBFS / AUTOFS / DEVFS / Apple Disk Image Media 为强制排除项，不可关闭。", "Exclude filesystems unrelated to camera storage. SMBFS / AUTOFS / DEVFS / Apple Disk Image Media are always excluded."))
+                                  subtitle: langManager.text("排除通常不用于摄影机卡的文件系统。SMBFS、AUTOFS、DEVFS 和 Apple Disk Image Media 始终排除。", "Hide filesystems that are not normally used for camera cards. SMBFS, AUTOFS, DEVFS, and Apple Disk Image Media are always excluded."))
                     
                     VStack(spacing: 0) {
                         toggleRow(
@@ -124,7 +124,7 @@ struct SettingsView: View {
                     .cornerRadius(8)
                 }
                 
-                // MARK: - 3. 卷名黑名单
+                // MARK: - 3. Camera model detection
                 sectionCard {
                     sectionHeader(
                         icon: "camera.metering.unknown",
@@ -159,7 +159,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - 4. 卷名黑名单
+                // MARK: - 4. Volume name blocklist
                 sectionCard {
                     sectionHeader(icon: "list.bullet.rectangle", title: langManager.text("卷名黑名单", "Volume Name Blocklist"),
                                   subtitle: langManager.text("以下卷名将被自动忽略，不显示在侧边栏中。", "Volumes with these names will be automatically ignored in the sidebar."))

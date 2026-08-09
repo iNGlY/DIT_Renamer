@@ -6,13 +6,15 @@ enum CUPSPrinterError: LocalizedError {
     case renderFailed
     case submissionFailed(String)
     case timedOut(String)
+    case invalidCustomProfile(String)
 
     var errorDescription: String? {
         switch self {
         case .noQueue: return "Select a CUPS printer queue."
-        case .renderFailed: return "DIT Printer could render the label image."
+        case .renderFailed: return "DIT Printer could not render the label image."
         case .submissionFailed(let reason): return reason
         case .timedOut(let command): return "\(command) did not return within 20 seconds."
+        case .invalidCustomProfile(let reason): return reason
         }
     }
 }
@@ -30,16 +32,36 @@ enum CUPSPrinter {
             .sorted()
     }
 
-    static func submit(job: DITPrinterJob, queueName: String, template: LabelTemplate) throws -> String {
-        guard !queueName.isEmpty else { throw CUPSPrinterError.noQueue }
-        let data = try TSPLLabelRenderer.render(job: job, template: template)
+    static func submit(job: DITPrinterJob, profile: PrintProfile, template: LabelTemplate) throws -> String {
         let directory = try DITPrinterJob.jobsDirectory()
             .deletingLastPathComponent()
             .appendingPathComponent("Rendered", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let fileURL = directory.appendingPathComponent("\(job.id.uuidString).tspl")
-        try data.write(to: fileURL, options: .atomic)
-        return try run(executable: "/usr/bin/lp", arguments: ["-d", queueName, "-o", "raw", fileURL.path])
+
+        switch profile.outputKind {
+        case .cupsRawTSPL:
+            guard !profile.queueName.isEmpty else { throw CUPSPrinterError.noQueue }
+            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).tspl")
+            try TSPLLabelRenderer.render(job: job, template: template).write(to: fileURL, options: .atomic)
+            return try run(executable: "/usr/bin/lp", arguments: ["-d", profile.queueName, "-o", "raw", fileURL.path])
+        case .cupsPDF:
+            guard !profile.queueName.isEmpty else { throw CUPSPrinterError.noQueue }
+            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).pdf")
+            try TSPLLabelRenderer.pdfData(job: job, template: template).write(to: fileURL, options: .atomic)
+            let media = "Custom.\(template.widthMm)x\(template.heightMm)mm"
+            return try run(executable: "/usr/bin/lp", arguments: ["-d", profile.queueName, "-o", "media=\(media)", fileURL.path])
+        case .customCLI:
+            guard profile.executablePath.hasPrefix("/") else {
+                throw CUPSPrinterError.invalidCustomProfile("Custom CLI executable must be an absolute path.")
+            }
+            guard profile.arguments.contains("{file}") else {
+                throw CUPSPrinterError.invalidCustomProfile("Custom CLI arguments must contain {file}.")
+            }
+            let fileURL = directory.appendingPathComponent("\(job.id.uuidString).pdf")
+            try TSPLLabelRenderer.pdfData(job: job, template: template).write(to: fileURL, options: .atomic)
+            let arguments = profile.arguments.map { $0 == "{file}" ? fileURL.path : $0 }
+            return try run(executable: profile.executablePath, arguments: arguments)
+        }
     }
 
     private static func run(executable: String, arguments: [String], timeout: TimeInterval = 20) throws -> String {
@@ -70,6 +92,21 @@ enum CUPSPrinter {
     }
 }
 
+private final class LabelPDFView: NSView {
+    private let image: NSImage
+
+    init(image: NSImage, frame: NSRect) {
+        self.image = image
+        super.init(frame: frame)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        image.draw(in: bounds)
+    }
+}
+
 enum TSPLLabelRenderer {
     static func render(job: DITPrinterJob, template: LabelTemplate = .defaultTemplate) throws -> Data {
         guard let representation = bitmapRepresentation(job: job, template: template) else { throw CUPSPrinterError.renderFailed }
@@ -97,6 +134,17 @@ enum TSPLLabelRenderer {
         return data
     }
 
+    static func pdfData(job: DITPrinterJob, template: LabelTemplate = .defaultTemplate) throws -> Data {
+        guard let representation = bitmapRepresentation(job: job, template: template) else {
+            throw CUPSPrinterError.renderFailed
+        }
+        let size = NSSize(width: template.widthMm / 25.4 * 72, height: template.heightMm / 25.4 * 72)
+        let image = NSImage(size: size)
+        image.addRepresentation(representation)
+        return LabelPDFView(image: image, frame: NSRect(origin: .zero, size: size))
+            .dataWithPDF(inside: NSRect(origin: .zero, size: size))
+    }
+
     private static func bitmapRepresentation(job: DITPrinterJob, template: LabelTemplate) -> NSBitmapImageRep? {
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
@@ -116,35 +164,32 @@ enum TSPLLabelRenderer {
         NSGraphicsContext.current = context
         NSColor.white.setFill()
         NSBezierPath(rect: NSRect(x: 0, y: 0, width: template.widthDots, height: template.heightDots)).fill()
-        let values = [
-            ("BIN", job.binName),
-            ("LAST", job.lastAssetName),
-            ("COPIED", copyTime(job.copyCompletedAt)),
-            ("CARD REUSE", job.reuseCount.map(String.init) ?? "(not set)")
-        ]
+        let values = template.enabledFields.map { field in
+            (field.title, value(for: field, job: job, template: template))
+        }
 
         let labelWidth = CGFloat(template.widthDots)
         let labelHeight = CGFloat(template.heightDots)
         let horizontalMargin = max(12, min(24, labelWidth * 0.04))
         let verticalMargin = max(10, min(20, labelHeight * 0.04))
         let contentWidth = labelWidth - (horizontalMargin * 2)
-        let headerFont = NSFont.boldSystemFont(ofSize: max(14, min(25, labelHeight * 0.062)))
-        let footerFont = NSFont.systemFont(ofSize: max(7, min(12, labelHeight * 0.03)))
-        let fieldFont = NSFont.boldSystemFont(ofSize: max(8, min(15, labelHeight * 0.037)))
-        let valueFont = NSFont.systemFont(ofSize: max(10, min(22, labelHeight * 0.052)))
+        let headerFont = NSFont.boldSystemFont(ofSize: max(12, min(25, labelHeight * 0.062)))
+        let footerFont = NSFont.systemFont(ofSize: max(6, min(12, labelHeight * 0.03)))
+        let fieldFont = NSFont.boldSystemFont(ofSize: max(7, min(15, labelHeight * 0.037)))
+        let valueFont = NSFont.systemFont(ofSize: max(8, min(22, labelHeight * 0.052)))
         let headerY = labelHeight - verticalMargin - headerFont.pointSize
         let footerY = verticalMargin
         let contentTop = headerY - 10
         let contentBottom = footerY + footerFont.pointSize + 8
-        let rowHeight = max(30, (contentTop - contentBottom) / CGFloat(values.count))
+        let rowHeight = max(18, (contentTop - contentBottom) / CGFloat(values.count))
 
-        draw("DIT PRINTER  |  \(template.name)", at: CGPoint(x: horizontalMargin, y: headerY), font: headerFont, width: contentWidth)
+        draw(template.title.isEmpty ? "DIT PRINTER" : template.title, at: CGPoint(x: horizontalMargin, y: headerY), font: headerFont, width: contentWidth)
         for (index, entry) in values.enumerated() {
             let rowTop = contentTop - (CGFloat(index) * rowHeight)
             draw(entry.0, at: CGPoint(x: horizontalMargin, y: rowTop - fieldFont.pointSize), font: fieldFont, width: contentWidth)
             draw(entry.1.isEmpty ? "(not supplied)" : entry.1, at: CGPoint(x: horizontalMargin, y: rowTop - fieldFont.pointSize - valueFont.pointSize - 5), font: valueFont, width: contentWidth)
         }
-        draw("Silverstack Copy + Verify complete", at: CGPoint(x: horizontalMargin, y: footerY), font: footerFont, width: contentWidth)
+        draw(template.footer, at: CGPoint(x: horizontalMargin, y: footerY), font: footerFont, width: contentWidth)
         NSGraphicsContext.restoreGraphicsState()
 
         return representation
@@ -193,5 +238,18 @@ enum TSPLLabelRenderer {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZ"
         return formatter.string(from: date)
+    }
+
+    private static func value(for field: LabelField, job: DITPrinterJob, template: LabelTemplate) -> String {
+        switch field {
+        case .binName: return job.binName
+        case .lastAssetName: return job.lastAssetName
+        case .copyCompletedAt: return copyTime(job.copyCompletedAt)
+        case .reuseCount: return job.reuseCount.map(String.init) ?? "(not set)"
+        case .signalSource: return job.signalSource
+        case .signalReceivedAt: return copyTime(job.receivedAt)
+        case .sourceVolume: return job.sourceVolumePath ?? "(not supplied)"
+        case .customNote: return template.customNote
+        }
     }
 }

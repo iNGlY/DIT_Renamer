@@ -52,8 +52,8 @@ struct AboutView: View {
                         .cornerRadius(6)
                 }
                 Text(langManager.text(
-                    "专业影视 DIT 存储卡卷识别、重命名与审计工具",
-                    "Professional DIT Camera Media Volume Renaming and Audit Utility"
+                    "拷贝前确认摄影机卡卷名，并记录每次重命名",
+                    "Confirm camera-card volume names before offload and record every rename"
                 ))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
@@ -66,7 +66,7 @@ struct AboutView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading(
                 icon: "shield.checkered",
-                title: langManager.text("核心宗旨", "Core Purpose")
+                title: langManager.text("DIT Renamer 的用途", "What DIT Renamer Does")
             )
 
             Text(langManager.text(
@@ -88,7 +88,7 @@ struct AboutView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeading(
                 icon: "checklist",
-                title: langManager.text("核心功能", "Key Features")
+                title: langManager.text("功能", "Features")
             )
 
             featureRow(
@@ -143,8 +143,8 @@ struct AboutView: View {
             featureRow(
                 title: langManager.text("原生 Swift 应用", "Native Swift Application"),
                 desc: langManager.text(
-                    "应用使用 Swift、SwiftUI 和 AppKit 构建，大部分功能实现代码由 AI 完成；卷管理通过 macOS diskutil 完成，exiftool 为可选工具。",
-                    "Built with Swift, SwiftUI, and AppKit, with most feature implementation code produced by AI. Volume operations use macOS diskutil, and exiftool is optional."
+                    "应用使用 Swift、SwiftUI 和 AppKit 构建。卷管理通过 macOS diskutil 完成，exiftool 为可选工具。",
+                    "Built with Swift, SwiftUI, and AppKit. Volume operations use macOS diskutil, and exiftool is optional."
                 )
             )
         }
@@ -183,10 +183,10 @@ struct AboutView: View {
                 .font(.title2)
                 .foregroundColor(.red)
             VStack(alignment: .leading, spacing: 2) {
-                Text(langManager.text("官方小红书", "Official REDNOTE"))
+                Text(langManager.text("联系 DIT247", "Contact DIT247"))
                     .font(.caption)
                     .fontWeight(.bold)
-                Text(langManager.text("小红书：DIT247", "REDNOTE: DIT247"))
+                Text(langManager.text("小红书：DIT247", "Xiaohongshu: DIT247"))
                     .font(.system(.body, design: .monospaced))
                     .fontWeight(.semibold)
                     .foregroundColor(.blue)

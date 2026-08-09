@@ -1,32 +1,17 @@
-# DIT Printer (experimental)
+# DIT Printer and Silverstack Setup
 
-`DIT Printer` is a standalone macOS application for an early, deliberately
-separate label-printing workflow. A Silverstack Lab Copy Job with Verify
-included sends a completion event to `DITPrinterBridge`; the bridge persists a
-print job and opens the app. The operator enters the physical card reuse count,
-verifies the label fields, then submits the job to a GP-M325F CUPS raw queue.
+DIT Printer is a separate macOS application for printing camera-card labels after a Silverstack Copy Job, including Verify, finishes successfully. It is not part of DIT Renamer 1.1.1.
 
-It does not alter, mount, rename, eject, verify, or delete camera media.
-The optional `ParaShootEraseBridge` is a separate, explicit post-verification
-integration. It invokes ParaShoot's reversible erase workflow only when the
-documented Copy Job Post Step with Verify included is installed.
+DIT Printer does not mount, rename, eject, verify, or delete camera media. The optional ParaShoot bridge is a separate integration. It can request ParaShoot's reversible erase workflow only from the documented Silverstack post step.
 
-## Trigger timing: Copy Job with Verify included
+## Workflow
 
-When Verify is configured as **Included** in the Copy Job, install
-`src_printer/Silverstack/DITPrinterAndParaShootAfterCopyVerify.lua` as the
-Copy Job's Post Step. Its Input Files must be ordered as source card first,
-then destination 1. The single `onFinish(..., success)` callback emits the
-print and ParaShoot signals together only after that Copy Job, including its
-Verify, finishes successfully.
+Use `src_printer/Silverstack/DITPrinterAndParaShootAfterCopyVerify.lua` as the final post step of a Copy Job with Verify set to **Included**. Configure its input files in this order:
 
-Both bridges are launched in the background. Printing is queued for the DIT's
-reuse-count entry while ParaShoot independently preflights and performs its
-reversible erase workflow. The Silverstack job does not wait for the erase to
-finish.
+1. Source camera card
+2. Destination 1, verified by the same Copy Job
 
-The label states `Silverstack Copy + Verify complete`. A later bridge failure
-does not change the successful Copy Job/Verify result.
+Silverstack calls the post step after the Copy Job and Verify finish successfully. The script then queues a label and, when configured, sends a separate request to ParaShoot. Silverstack does not wait for printing or erasure to finish. A later bridge error does not change the Copy Job's successful Verify result.
 
 ## Build and install
 
@@ -36,108 +21,66 @@ bash -n scripts/build_dit_printer.sh
 open "build_printer/DIT Printer.app"
 ```
 
-Install the generated `DIT Printer.app` in `/Applications` before enabling the
-Silverstack script. The script invokes this fixed path:
+Install `DIT Printer.app` in `/Applications` before enabling the Silverstack script. The script expects this helper path:
 
 ```text
 /Applications/DIT Printer.app/Contents/Helpers/DITPrinterBridge
 ```
 
-The app ledger is stored at:
+Print jobs are stored as JSON files in:
 
 ```text
 ~/Library/Application Support/DIT Printer/Jobs
 ```
 
-Each job is a JSON file. A repeated `job_id` is treated as the same job, so a
-Silverstack retry does not create another pending label.
-
-For an isolated development test only, set `DIT_PRINTER_DATA_DIRECTORY` to an
-empty test directory before launching the app or bridge. This overrides the
-normal job ledger location and must not be used for a live station.
+A repeated `job_id` updates the existing job instead of creating another pending label. For isolated development tests, `DIT_PRINTER_DATA_DIRECTORY` can point to an empty test directory. Do not use that override on a live workstation.
 
 ## GP-M325F setup
 
-1. Pair/connect the printer and use its self-test/settings page to switch it
-   to **TSPL label mode**.
-2. In macOS add a queue that passes raw data through to the printer. Give it a
-   stable name such as `GP-M325F`.
-3. In DIT Printer, choose that queue and press **Refresh printer queues**.
-4. Use the label-tag toolbar button to select a stock preset or save a custom
-   width, height, and gap template. Print at least 20 labels using each actual
-   stock before field use.
+1. Set the printer to TSPL label mode using its settings or self-test page.
+2. Add a macOS CUPS queue that passes raw data to the printer. Use a stable name such as `GP-M325F`.
+3. Select that queue in DIT Printer and refresh the queue list.
+4. Choose a stock preset or save a template with the correct width, height, and gap.
+5. Calibrate and print at least 20 labels on each stock before field use.
 
-DIT Printer rasterizes all variable fields into a TSPL `BITMAP` command. This
-allows Chinese Bin names and file names without relying on a printer-resident
-Chinese font. Built-in stocks are 72 x 51, 60 x 40, 50 x 30, and 80 x 50 mm.
-Saved custom templates persist for the current macOS user and can be selected
-by every Silverstack project on that workstation. The printer and stock still
-require physical calibration.
+DIT Printer renders variable text into a TSPL `BITMAP`, so Chinese Bin names and filenames do not depend on fonts installed in the printer. Built-in stock sizes are 72 x 51, 60 x 40, 50 x 30, and 80 x 50 mm. Custom templates are saved for the current macOS user. Physical calibration is still required for each printer and stock combination.
 
-## Required label fields
+The profile editor also supports a generic CUPS PDF queue and a custom CLI. The CLI receives the generated PDF through a `{file}` argument. Templates can control the title, footer, note, and printed fields. Print history can be exported as CSV or JSON; these exports record the Printer workflow and do not replace Silverstack reports.
 
-The job editor shows and prints:
+## Label data
+
+Each label contains:
 
 - Silverstack Bin name
-- final asset filename supplied by the Silverstack Post Step
-- copy-completion timestamp (UTC from Silverstack)
-- manually entered physical card reuse count
+- final asset filename supplied by the post step
+- Copy Job completion time supplied by Silverstack
+- card reuse count entered by the operator
 
-The bridge rejects an empty Bin name or final-asset field. The app keeps both
-fields editable because Silverstack metadata getter names may differ between
-versions and workflows. Before field deployment, run a test card and inspect
-the manifest in the Silverstack working directory. `getBinName` and
-`getFileName` are attempted first in the Lua template; update the small getter
-lists in `binNameFor` and `lastAssetNameFor` if that installation uses other
-API names.
+The bridge rejects an empty Bin name or final-asset field. Both fields remain editable because Silverstack metadata APIs can differ between versions. Before deployment, run a test Copy Job and inspect the post-step manifest. The Lua script tries `getBinName` and `getFileName` first; update the getter lists only when the installed Silverstack version uses different API names.
 
-The post-step asset order must be tested on the installed Silverstack version.
-The template uses the final element returned in `assets`; it does not infer
-copy order from filesystem modification times, because that would make the
-label less trustworthy.
+The script uses the final item in Silverstack's `assets` array. Confirm that ordering on the installed version. It does not infer order from filesystem timestamps.
 
-## Dry run and acceptance
+## Acceptance test
 
-Before connecting the printer, use a temporary CUPS queue or keep the app open
-and confirm that a Copy Job with Verify included creates one pending job.
-Confirm the timestamp is the completed Copy Job time and that a deliberately
-failed Verify creates neither a label task nor an erase request.
+Before connecting a production printer, confirm that a successful Copy Job with Verify creates one pending print job and that a failed Copy or Verify creates neither a print job nor an erase request. Test Chinese names, long filenames, the highest expected reuse count, printer-offline recovery, CUPS retry, and a repeated post step.
 
-Finally test: Chinese names, long filenames, the highest expected reuse count,
-printer offline behavior, CUPS retry, and re-running the same Post Step. Keep
-the printed labels and job files as an operational audit trail.
+Keep the job JSON files and printed labels as an operational record. They do not replace Silverstack's copy and verification reports.
 
-## ParaShoot erase after Verify
+## ParaShoot after Verify
 
-ParaShoot 2.3.13 includes an official CLI whose `erase` command checks backup
-availability before invoking ParaShoot's reversible erase operation. The
-bundled bridge uses exactly one explicitly supplied, Silverstack-verified
-destination as requested:
+The bridge calls ParaShoot with one source card and the one destination verified by the same Copy Job:
 
 ```text
 parashoot erase --card <source-card> --destinations <verified-destination> \
   --min-destinations 1 --no-auto-add-shuttle-drives --machine-readable
 ```
 
-For Copy Jobs with Verify included, use the combined
-`DITPrinterAndParaShootAfterCopyVerify.lua` template above instead of this
-separate template. `ParaShootEraseAfterVerification.lua` remains for workflows
-where Verify is a distinct activity. In either case, Input Files must be
-ordered as the source card first, then the destination that same Verify
-activity checked.
+Before making the request, it checks that the source is an existing `/Volumes` root, confirms removable/external status with `diskutil`, runs `parashoot is-card`, and confirms that the destination is a different existing directory. It does not use `--wait`, `--erase-empty`, or automatic shuttle-drive discovery.
 
-Before calling ParaShoot, the bridge requires the card path to still be an
-existing `/Volumes` root, confirms it is removable/external with `diskutil`,
-checks it using `parashoot is-card`, and confirms that the destination is a
-different existing directory. It never runs `--wait`, `--erase-empty`, or
-auto-adds shuttle drives. Bridge output is written to:
+Bridge results are written to:
 
 ```text
 ~/Library/Application Support/DIT Printer/ParaShootEraseJobs
 ```
 
-An erase failure is recorded and returned to the Post Step, but the Lua script
-does not throw an error, so a completed Silverstack Verify remains recorded as
-successful. Test with a disposable card and a known destination before using a
-production card. This workflow still changes the card's filesystem state even
-though ParaShoot supports restoration.
+Test this workflow with a disposable card and a known destination. ParaShoot erasure is reversible, but it still changes the card's filesystem state.
