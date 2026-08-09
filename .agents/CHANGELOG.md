@@ -166,6 +166,6 @@ and handoff context.
 ### 2026-08-10 — [agent] Make main the public default and simplify README
 - Commit: `1048f31`
 - Branch: `main`
-- Changed: User-facing README cleanup, bottom-only AI attribution, local branch rename to `main`, and removal of `[codex]` text markers from tracked collaboration files.
-- Validation: README contains no Codex reference; tracked source text contains no literal `[codex]`; local and GitHub default branch are `main`; GitHub Pages reports `built`; the live signed appcast and raw `main` README both passed content checks; full application regression checks were already passed before this documentation-only change.
+- Changed: User-facing README cleanup, bottom-only AI attribution, local branch rename to `main`, and removal of agent-specific text markers from tracked collaboration files.
+- Validation: README contains no agent-tooling reference; tracked source text contains no bracketed author marker; local and GitHub default branch are `main`; GitHub Pages reports `built`; the live signed appcast and raw `main` README both passed content checks; full application regression checks were already passed before this documentation-only change.
 - Follow-up/risk: Existing immutable Git history and the retained local baseline branch are not rewritten. The remote branch was renamed in place, so the public repository now exposes `main` as the default without losing commits.
