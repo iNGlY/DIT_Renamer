@@ -14,6 +14,8 @@ APP_PATH="$RELEASE_DIR/$ASSET_BASENAME.app"
 CHECKSUM_PATH="$RELEASE_DIR/SHA256SUMS.txt"
 METADATA_PATH="$RELEASE_DIR/RELEASE_METADATA.txt"
 NOTES_PATH="$PROJECT_ROOT/docs/github_release_notes_1.1.md"
+LICENSE_PATH="$PROJECT_ROOT/LICENSE"
+NOTICE_PATH="$PROJECT_ROOT/NOTICE"
 
 fail() {
     echo "[ERROR] $1" >&2
@@ -29,7 +31,7 @@ cd "$PROJECT_ROOT"
 gh auth status >/dev/null 2>&1 || fail "GitHub CLI is not authenticated. Run: gh auth login"
 git remote get-url origin >/dev/null 2>&1 || fail "Git remote 'origin' is not configured."
 
-for asset in "$ZIP_PATH" "$DMG_PATH" "$APP_PATH" "$CHECKSUM_PATH" "$METADATA_PATH" "$NOTES_PATH"; do
+for asset in "$ZIP_PATH" "$DMG_PATH" "$APP_PATH" "$CHECKSUM_PATH" "$METADATA_PATH" "$NOTES_PATH" "$LICENSE_PATH" "$NOTICE_PATH"; do
     [[ -e "$asset" ]] || fail "Missing release asset: $asset"
 done
 
@@ -62,6 +64,8 @@ gh release create "$TAG" \
     "$DMG_PATH" \
     "$ZIP_PATH" \
     "$CHECKSUM_PATH" \
+    "$LICENSE_PATH" \
+    "$NOTICE_PATH" \
     --title "DIT Renamer 1.1" \
     --notes-file "$NOTES_PATH" \
     --prerelease \

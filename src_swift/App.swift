@@ -1,3 +1,6 @@
+// Copyright 2026 DIT247
+// SPDX-License-Identifier: Apache-2.0
+
 import SwiftUI
 import AppKit
 

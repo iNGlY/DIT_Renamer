@@ -1,3 +1,6 @@
+// Copyright 2026 DIT247
+// SPDX-License-Identifier: Apache-2.0
+
 import SwiftUI
 
 struct AboutView: View {
@@ -158,6 +161,14 @@ struct AboutView: View {
                 "DIT Printer is a separate extension and is not included in the DIT Renamer 1.1 application. Renamer only exposes a read-only audit-data interface; Printer cannot trigger rename, verification, or erase operations."
             ))
             .font(.caption)
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Text(langManager.text(
+                "原始发布者：DIT247 · Apache License 2.0 · github.com/iNGlY/DIT_Renamer",
+                "Original publisher: DIT247 · Apache License 2.0 · github.com/iNGlY/DIT_Renamer"
+            ))
+            .font(.caption2)
             .foregroundColor(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }

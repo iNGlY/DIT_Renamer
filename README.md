@@ -68,3 +68,9 @@ GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.m
 重命名是卷级元数据操作。执行前应停止会持续访问该卷的拷贝、校验或媒体管理任务；程序自身不会替现场人员判断 Silverstack、Finder 或其他进程是否仍在使用媒体。拔卡、换卡或设备节点变化后，必须重新选择并扫描卷。
 
 厂商命名规则、媒体结构和同类软件能力的核对结果见 [`docs/research_swift_1.1_vendor_rules.md`](docs/research_swift_1.1_vendor_rules.md)。
+
+## 许可证与署名
+
+Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE) 发布，原始发布者与官方来源记录在 [NOTICE](NOTICE) 中。
+
+允许个人及商业使用、修改和再分发，但分发源码或二进制及其衍生版本时必须遵守 Apache-2.0，包括保留许可证、相关版权声明和 NOTICE 中的 DIT247 原始发布者信息，并对修改过的文件作出说明。本许可证不授予第三方冒充官方版本或超出合理来源说明范围使用 DIT247 名称与产品标识的权利。

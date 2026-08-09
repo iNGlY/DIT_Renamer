@@ -26,8 +26,14 @@ DIT Renamer 1.1 是面向 macOS 14+ 现场 DIT 工作流的原生 Swift 应用�
 
 下载后请使用随 Release 提供的 `SHA256SUMS.txt` 核对 DMG 或 ZIP。
 
+## 许可证
+
+Copyright 2026 DIT247。项目采用 Apache License 2.0，商业使用和再分发必须保留许可证、版权声明及 `NOTICE` 中的 DIT247 原始发布者信息。官方源码位于 <https://github.com/iNGlY/DIT_Renamer>。
+
 ---
 
 DIT Renamer 1.1 is a native Swift application for macOS 14+ on-set DIT workflows. This prerelease contains a universal Apple Silicon and Intel build, safer volume identity checks, forced remount after rename, camera-media naming safeguards, Sony metadata detection, and localized read-only ParaShoot audit reports.
 
 The attached assets are ad-hoc signed and **not Apple-notarized**. Gatekeeper may block direct launch, so this build is published as a prerelease. It does not include scripts that clear quarantine attributes or bypass Gatekeeper automatically.
+
+Licensed under Apache License 2.0. Commercial redistribution must retain the license, copyright notices, and the DIT247 attribution contained in `NOTICE`.

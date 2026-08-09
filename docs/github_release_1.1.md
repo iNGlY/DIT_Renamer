@@ -25,6 +25,8 @@
 - `dit_renamer_Release_1.1-adhoc-unnotarized.dmg`
 - `dit_renamer_Release_1.1-adhoc-unnotarized.zip`
 - `SHA256SUMS.txt`
+- `LICENSE`
+- `NOTICE`
 - GitHub 自动生成的 tag source archives；本地 `Release/Source Code` 用于核对构建来源。
 
 发布脚本会验证 ZIP、DMG 和校验和文件存在，并核对 App 二进制同时包含 `arm64` 与 `x86_64`。

@@ -159,6 +159,11 @@ DMG_STAGE="$BUILD_DIR/dmg_stage"
 mkdir -p "$DMG_STAGE"
 ditto "$APP_BUNDLE" "$DMG_STAGE/DIT Renamer.app"
 ln -s /Applications "$DMG_STAGE/Applications"
+for legal_file in LICENSE NOTICE; do
+    [[ -f "$PROJECT_ROOT/$legal_file" ]] || fail "Missing legal file: $legal_file"
+    cp "$PROJECT_ROOT/$legal_file" "$DMG_STAGE/$legal_file"
+    cp "$PROJECT_ROOT/$legal_file" "$STAGED_RELEASE_DIR/$legal_file"
+done
 
 if [[ "$RELEASE_MODE" == "developer-id" ]]; then
     cat <<'EOF' > "$DMG_STAGE/安装说明.txt"
