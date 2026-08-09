@@ -31,7 +31,7 @@ enum PrintHistoryExporter {
         let header = [
             "job_id", "status", "signal_source", "signal_received_at", "copy_completed_at",
             "bin_name", "last_asset_name", "reuse_count", "source_volume_path", "template",
-            "profile", "output_kind", "queue", "submission_response", "printed_at", "error"
+            "profile", "output_kind", "printer_language", "queue", "submission_response", "printed_at", "error"
         ]
         var rows = [header.map(escape).joined(separator: ",")]
         for job in jobs.sorted(by: { $0.receivedAt > $1.receivedAt }) {
@@ -39,7 +39,8 @@ enum PrintHistoryExporter {
                 job.id.uuidString, job.status.rawValue, job.signalSource, timestamp(job.receivedAt),
                 timestamp(job.copyCompletedAt), job.binName, job.lastAssetName, job.reuseCount.map(String.init) ?? "",
                 job.sourceVolumePath ?? "", job.labelTemplate?.name ?? "", job.printProfile?.name ?? "",
-                job.printProfile?.outputKind.rawValue ?? "", job.queueName ?? "", job.cupsJobReference ?? "",
+                job.printProfile?.outputKind.rawValue ?? "", job.printProfile?.printerLanguage.rawValue ?? "",
+                job.queueName ?? "", job.cupsJobReference ?? "",
                 job.printedAt.map(timestamp) ?? "", job.lastError ?? ""
             ]
             rows.append(row.map(escape).joined(separator: ","))

@@ -39,6 +39,11 @@ enum LabelRendererSmokeTest {
                     fatalError("Unexpected \(language.rawValue.uppercased()) command header")
                 }
             }
+            let legacyProfileJSON = Data("{\"id\":\"legacy\",\"name\":\"Legacy TSPL\",\"outputKind\":\"cupsRawTSPL\",\"queueName\":\"printer\",\"executablePath\":\"\",\"arguments\":[]}".utf8)
+            let legacyProfile = try JSONDecoder().decode(PrintProfile.self, from: legacyProfileJSON)
+            guard legacyProfile.printerLanguage == .tspl else {
+                fatalError("Legacy print profile did not default to TSPL")
+            }
             print("Label renderer smoke test passed: TSPL=\(label.count), custom=\(compactLabel.count), PDF=\(pdf.count) bytes, ZPL/EPL/CPCL headers valid")
         } catch {
             fatalError("TSPL label smoke test failed: \(error.localizedDescription)")

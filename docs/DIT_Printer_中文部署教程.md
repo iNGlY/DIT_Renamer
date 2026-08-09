@@ -29,8 +29,10 @@ DIT Printer 不会挂载、重命名、弹出、校验或删除摄影机卡。Pa
 4. 在 DIT Printer 的打印配置中选择一种输出方式，并保存为配置：
 
    - `CUPS PDF`：推荐的默认方式，适用于大多数 macOS 可打印的便携标签机与普通打印机。
-   - `CUPS Raw command`：用于 GP-M325F 等标签机。当前支持 TSPL、ZPL、EPL/EPL2 和 CPCL；具体语言必须与打印机固件一致，队列必须允许 Raw 数据。
-   - `Custom CLI`：给没有合适 CUPS 工作流的设备。填写绝对可执行文件路径，每行一个参数，并保留单独一行 `{file}`。应用会以 PDF 临时文件路径替换该占位符，直接启动该程序，不经过 shell。
+   - `CUPS Raw command`：用于允许 Raw 数据的标签机。语言可选 `TSPL`、`ZPL`、`EPL/EPL2` 或 `CPCL`，适合 GP-M325F、TSC、Zebra 及部分 Zebra 移动打印机。当前原始位图按 203 dpi 生成，设备为 300 dpi 时应建立独立模板并现场校准。
+   - `Custom CLI`：给没有合适 CUPS 工作流、但厂商提供 CLI 的设备。语言可选 `TSPL`、`ZPL`、`EPL/EPL2`、`CPCL` 或 `PDF`。填写绝对可执行文件路径，每行一个参数，并保留单独一行 `{file}`；应用会以对应的 `.tspl`、`.zpl`、`.epl`、`.cpcl` 或 `.pdf` 文件路径替换该占位符，直接启动该程序，不经过 shell。
+
+在应用的“打印配置”设置页选择 `Printer language`。语言只是打印数据格式，仍需在打印机驱动、CUPS 队列或 CLI 工具中选择正确的机型、分辨率、标签间隙和切纸策略。不同厂商即使都支持 ZPL，也可能对校准、介质尺寸和状态返回有差异；首次接入必须使用废标签验证。
 
 5. 打开标签模板，选择预设尺寸，或填写名称、宽度、高度和间隙后保存。模板、打印配置都保存在当前 macOS 用户的偏好设置中，可以跨 Silverstack 项目使用；每次提交会把实际使用的模板和打印配置快照写进历史任务。
 
@@ -49,7 +51,7 @@ DIT Printer 收到桥接器 manifest 的瞬间会记录“Signal source”和“
 - CSV：便于在 Numbers、Excel 或制片日志中筛选。
 - JSON：保留完整作业结构，适合归档或后续工具处理。
 
-历史记录位于 `~/Library/Application Support/DIT Printer/Jobs`，是导出的来源。不要手工编辑这些 JSON 文件；需要调整待打印内容，请在 DIT Printer 中修改后重新提交。
+历史记录位于 `~/Library/Application Support/DIT Printer/Jobs`，是导出的来源。CSV 还会记录 `printer_language`，用于追溯这次提交实际生成的是 TSPL、ZPL、EPL、CPCL 还是 PDF。不要手工编辑这些 JSON 文件；需要调整待打印内容，请在 DIT Printer 中修改后重新提交。
 
 ## 配置 Silverstack 项目
 
@@ -87,6 +89,8 @@ DIT Printer 收到桥接器 manifest 的瞬间会记录“Signal source”和“
 **普通打印机只打印到 A4 或内容缩放**：改用 `CUPS PDF` 配置，确认驱动中存在相近的自定义介质，或建立与耗材尺寸对应的 CUPS 预设。DIT Printer PDF 自带标签页面大小，但最终边距仍由厂商驱动决定。
 
 **自定义 CLI 不执行**：可执行文件必须是绝对路径；参数一行一个，并且必须有单独的 `{file}` 参数。应用不会解释 `|`、`>`、`&&` 等 shell 语法，以避免素材名或路径被当作命令执行。
+
+**ZPL/EPL/CPCL 打印空白或方向相反**：确认打印机处于对应命令语言模式，并检查打印机分辨率是否为 203 dpi。DIT Printer 先生成黑白位图，再使用 `^GFA`、`GW` 或 `CG` 写入命令；命令语言模式错误时，打印机可能把原始命令当作普通文本或直接忽略。
 
 **切换 Silverstack 项目后找不到模板**：模板属于当前 macOS 用户，而不是 Silverstack 项目。确认应用运行在同一台工作站和同一用户下。
 

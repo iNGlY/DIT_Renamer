@@ -195,7 +195,7 @@ enum TSPLLabelRenderer {
         let footerY = verticalMargin
         let contentTop = headerY - 10
         let contentBottom = footerY + footerFont.pointSize + 8
-        let rowHeight = max(18, (contentTop - contentBottom) / CGFloat(values.count))
+        let rowHeight = values.isEmpty ? 0 : max(18, (contentTop - contentBottom) / CGFloat(values.count))
 
         draw(template.title.isEmpty ? "DIT PRINTER" : template.title, at: CGPoint(x: horizontalMargin, y: headerY), font: headerFont, width: contentWidth)
         for (index, entry) in values.enumerated() {
