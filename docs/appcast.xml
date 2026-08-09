@@ -12,7 +12,7 @@
             <sparkle:version>1110</sparkle:version>
             <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.1.1/dit_renamer_Release_1.1.1-adhoc-unnotarized.zip" length="4142256" type="application/octet-stream" sparkle:edSignature="2oEb7VYEBgndmI4dV74erM0rSBFOATfTkEQ3DOjl5vuKI16i3Ka5qcpBWCVjGRdYdKh4mTEOW8oHXXxFkvYfAQ=="/>
+            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.1.1/dit_renamer_Release_1.1.1-adhoc-unnotarized.zip" length="4142051" type="application/octet-stream" sparkle:edSignature="e4CZTH2fIdVgb556Qsj5RaeDGVu6HBp2T0eVNCGAUDiV8qyuDV3tGQzWrHp7Yks+2AqTUyFAWX9bIlCto7L3BQ=="/>
         </item>
     </channel>
 </rss>
