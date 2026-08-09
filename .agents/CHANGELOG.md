@@ -87,7 +87,7 @@ and handoff context.
 - Follow-up/risk: XML/XMP is read first from at most 20 Sony-card sidecars of at most 1 MiB each. Only if it has no Sony model, the setting is enabled, and a representative video exists does one 2-second `exiftool -fast2` fallback run. A real card is still required to validate vendor-specific XML placement and exiftool field availability for every camera generation; no filename is used to infer a model.
 
 ### 2026-08-09 — [codex] Complete 1.1 remount flow and Printer audit interface
-- Commit: `pending`
+- Commit: `2c9f72d`
 - Branch: `codex/swift-1.1-hardening`
 - Changed: `src_swift/RenamerEngine.swift`, `src_swift/App.swift`, `src_swift/Views/MainDetailView.swift`, `src_swift/Models/PrinterAuditExport.swift`, `src_swift/Models/RenameHistoryStore.swift`, `src_printer/`, `docs/renamer_printer_audit_interface.md`, `README.md`
 - Validation: Swift typecheck; both build-script syntax checks; Renamer audit Reader fixture; TSPL label smoke test; standalone Printer build and codesign verification; 1.1 app/zip/DMG build and codesign verification; `git diff --check`.
