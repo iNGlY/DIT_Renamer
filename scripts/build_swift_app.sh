@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds, signs, notarizes, staples, and verifies the DIT Renamer 1.1 release.
+# Builds the DIT Renamer 1.1 release in strict Developer ID or explicit ad-hoc mode.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +8,22 @@ RELEASE_DIR="$PROJECT_ROOT/Release"
 BUILD_DIR="$PROJECT_ROOT/build_swift"
 STAGED_RELEASE_DIR="$BUILD_DIR/Release"
 VERSION="1.1"
-APP_NAME="dit_renamer_Release_${VERSION}"
+RELEASE_MODE="${DIT_RENAMER_RELEASE_MODE:-developer-id}"
+case "$RELEASE_MODE" in
+    developer-id)
+        ARTIFACT_SUFFIX=""
+        DMG_VOLUME_NAME="DIT Renamer $VERSION"
+        ;;
+    adhoc)
+        ARTIFACT_SUFFIX="-adhoc-unnotarized"
+        DMG_VOLUME_NAME="DIT Renamer $VERSION Ad-hoc"
+        ;;
+    *)
+        echo "[ERROR] DIT_RENAMER_RELEASE_MODE must be 'developer-id' or 'adhoc'." >&2
+        exit 1
+        ;;
+esac
+APP_NAME="dit_renamer_Release_${VERSION}${ARTIFACT_SUFFIX}"
 APP_BUNDLE="$STAGED_RELEASE_DIR/$APP_NAME.app"
 ZIP_PATH="$STAGED_RELEASE_DIR/$APP_NAME.zip"
 DMG_PATH="$STAGED_RELEASE_DIR/$APP_NAME.dmg"
@@ -25,21 +40,29 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Required command is unavailable: $1"
 }
 
-[[ -n "$SIGNING_IDENTITY" ]] || fail "Set DIT_RENAMER_SIGNING_IDENTITY to a Developer ID Application identity."
-[[ "$SIGNING_IDENTITY" == Developer\ ID\ Application:* ]] || fail "Signing identity must be a Developer ID Application certificate."
-[[ -n "$NOTARY_PROFILE" ]] || fail "Set DIT_RENAMER_NOTARY_PROFILE to a notarytool keychain profile."
-
-for required in swiftc lipo codesign security ditto hdiutil spctl xcrun git tar; do
+for required in swiftc lipo codesign ditto hdiutil git tar shasum; do
     require_command "$required"
 done
 
-IDENTITIES="$(security find-identity -v -p codesigning 2>&1)"
-[[ "$IDENTITIES" == *"$SIGNING_IDENTITY"* ]] || fail "The requested Developer ID Application identity is not available in the keychain."
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    for required in security spctl xcrun; do
+        require_command "$required"
+    done
+    [[ -n "$SIGNING_IDENTITY" ]] || fail "Set DIT_RENAMER_SIGNING_IDENTITY to a Developer ID Application identity."
+    [[ "$SIGNING_IDENTITY" == Developer\ ID\ Application:* ]] || fail "Signing identity must be a Developer ID Application certificate."
+    [[ -n "$NOTARY_PROFILE" ]] || fail "Set DIT_RENAMER_NOTARY_PROFILE to a notarytool keychain profile."
 
-echo "[PREFLIGHT] Validating notarization credentials..."
-xcrun notarytool history \
-    --keychain-profile "$NOTARY_PROFILE" \
-    --output-format json >/dev/null || fail "The notarytool profile is unavailable or could not authenticate."
+    IDENTITIES="$(security find-identity -v -p codesigning 2>&1)"
+    [[ "$IDENTITIES" == *"$SIGNING_IDENTITY"* ]] || fail "The requested Developer ID Application identity is not available in the keychain."
+
+    echo "[PREFLIGHT] Validating notarization credentials..."
+    xcrun notarytool history \
+        --keychain-profile "$NOTARY_PROFILE" \
+        --output-format json >/dev/null || fail "The notarytool profile is unavailable or could not authenticate."
+else
+    echo "[WARNING] Building an ad-hoc signed, unnotarized prerelease."
+    echo "[WARNING] Gatekeeper acceptance is not expected and this build is not suitable as a normal end-user release."
+fi
 
 cd "$PROJECT_ROOT"
 [[ -z "$(git status --porcelain)" ]] || fail "Commit all source changes and untracked files before creating a release."
@@ -51,7 +74,7 @@ done < <(find "$PROJECT_ROOT/src_swift" -name '*.swift' -print0)
 [[ ${#SWIFT_FILES[@]} -gt 0 ]] || fail "No Swift sources were found."
 
 echo "=================================================="
-echo "[BUILD] DIT Renamer $VERSION universal Developer ID release"
+echo "[BUILD] DIT Renamer $VERSION universal $RELEASE_MODE release"
 echo "=================================================="
 
 rm -rf "$BUILD_DIR"
@@ -107,30 +130,38 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 </plist>
 EOF
 
-echo "[SIGN] Signing app with Developer ID and secure timestamp..."
-codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    echo "[SIGN] Signing app with Developer ID and secure timestamp..."
+    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP_BUNDLE"
+else
+    echo "[SIGN] Applying ad-hoc signature to app..."
+    codesign --force --sign - "$APP_BUNDLE"
+fi
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
-echo "[NOTARY] Submitting app..."
-APP_NOTARY_ZIP="$BUILD_DIR/$APP_NAME-notary.zip"
-ditto -c -k --keepParent "$APP_BUNDLE" "$APP_NOTARY_ZIP"
-xcrun notarytool submit "$APP_NOTARY_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple "$APP_BUNDLE"
-xcrun stapler validate "$APP_BUNDLE"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    echo "[NOTARY] Submitting app..."
+    APP_NOTARY_ZIP="$BUILD_DIR/$APP_NAME-notary.zip"
+    ditto -c -k --keepParent "$APP_BUNDLE" "$APP_NOTARY_ZIP"
+    xcrun notarytool submit "$APP_NOTARY_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+    xcrun stapler staple "$APP_BUNDLE"
+    xcrun stapler validate "$APP_BUNDLE"
 
-echo "[GATEKEEPER] Assessing stapled app..."
-spctl --assess --type execute --verbose=4 "$APP_BUNDLE"
+    echo "[GATEKEEPER] Assessing stapled app..."
+    spctl --assess --type execute --verbose=4 "$APP_BUNDLE"
+fi
 
-echo "[ZIP] Packaging stapled universal app..."
+echo "[ZIP] Packaging universal app..."
 ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$ZIP_PATH"
 
-echo "[DMG] Creating signed distribution image..."
+echo "[DMG] Creating distribution image..."
 DMG_STAGE="$BUILD_DIR/dmg_stage"
 mkdir -p "$DMG_STAGE"
 ditto "$APP_BUNDLE" "$DMG_STAGE/DIT Renamer.app"
 ln -s /Applications "$DMG_STAGE/Applications"
 
-cat <<'EOF' > "$DMG_STAGE/安装说明.txt"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    cat <<'EOF' > "$DMG_STAGE/安装说明.txt"
 DIT Renamer 已使用 Apple Developer ID 签名、完成 notarization 并附加公证票据。
 
 安装：
@@ -140,24 +171,58 @@ DIT Renamer 已使用 Apple Developer ID 签名、完成 notarization 并附加�
 发布包不需要、也不提供 sudo xattr 或绕过 Gatekeeper 的修复脚本。
 如果 macOS 拒绝启动，请保留原始 DMG，并向发布者报告系统版本和提示文本。
 EOF
+else
+    cat <<'EOF' > "$DMG_STAGE/安装说明.txt"
+DIT Renamer 1.1 Ad-hoc 预发布版
 
-hdiutil create -volname "DIT Renamer $VERSION" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_PATH"
-codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+此构建未使用 Apple Developer ID 签名，也没有经过 Apple notarization。
+macOS Gatekeeper 可能阻止从 GitHub 下载的应用直接启动，因此本包不能视为“即开即用”的正式分发版本。
+
+安装：
+1. 将 DIT Renamer.app 拖入 Applications。
+2. 首次启动若被阻止，请在“系统设置 > 隐私与安全性”中核对应用来源并选择“仍要打开”。
+
+本发布包不包含 sudo、xattr、隔离属性清除脚本或其他自动绕过 Gatekeeper 的工具。
+EOF
+fi
+
+hdiutil create -volname "$DMG_VOLUME_NAME" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_PATH"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+else
+    codesign --force --sign - "$DMG_PATH"
+fi
 codesign --verify --strict --verbose=2 "$DMG_PATH"
 
-echo "[NOTARY] Submitting DMG..."
-xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple "$DMG_PATH"
-xcrun stapler validate "$DMG_PATH"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    echo "[NOTARY] Submitting DMG..."
+    xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+    xcrun stapler staple "$DMG_PATH"
+    xcrun stapler validate "$DMG_PATH"
 
-echo "[GATEKEEPER] Assessing stapled DMG..."
-spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+    echo "[GATEKEEPER] Assessing stapled DMG..."
+    spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+fi
 
 echo "[SOURCE] Exporting the exact committed source tree..."
 SOURCE_ARCHIVE="$BUILD_DIR/source.tar"
 mkdir -p "$SOURCE_DIR"
 git archive --format=tar HEAD --output="$SOURCE_ARCHIVE"
 tar -xf "$SOURCE_ARCHIVE" -C "$SOURCE_DIR"
+
+if [[ -f "$PROJECT_ROOT/docs/github_release_notes_1.1.md" ]]; then
+    cp "$PROJECT_ROOT/docs/github_release_notes_1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
+fi
+if [[ -f "$PROJECT_ROOT/docs/github_release_1.1.md" ]]; then
+    cp "$PROJECT_ROOT/docs/github_release_1.1.md" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_REQUIREMENTS.md"
+fi
+
+(
+    cd "$STAGED_RELEASE_DIR"
+    shasum -a 256 "$(basename "$ZIP_PATH")" "$(basename "$DMG_PATH")" > SHA256SUMS.txt
+    printf 'commit=%s\nrelease_mode=%s\narchitectures=arm64 x86_64\n' \
+        "$(git -C "$PROJECT_ROOT" rev-parse HEAD)" "$RELEASE_MODE" > RELEASE_METADATA.txt
+)
 
 echo "[PUBLISH] Replacing Release only after all validation passed..."
 PREVIOUS_RELEASE_DIR="$PROJECT_ROOT/.Release.previous.$$"
@@ -177,12 +242,19 @@ APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
 ZIP_PATH="$RELEASE_DIR/$APP_NAME.zip"
 DMG_PATH="$RELEASE_DIR/$APP_NAME.dmg"
 SOURCE_DIR="$RELEASE_DIR/Source Code"
+CHECKSUM_PATH="$RELEASE_DIR/SHA256SUMS.txt"
 
 echo "=================================================="
-echo "[SUCCESS] Signed, notarized, stapled, Gatekeeper-verified release complete"
+if [[ "$RELEASE_MODE" == "developer-id" ]]; then
+    echo "[SUCCESS] Signed, notarized, stapled, Gatekeeper-verified release complete"
+else
+    echo "[SUCCESS] Ad-hoc signed, unnotarized prerelease complete"
+    echo "  WARNING: Gatekeeper acceptance is not expected."
+fi
 echo "  App: $APP_BUNDLE"
 echo "  Zip: $ZIP_PATH"
 echo "  DMG: $DMG_PATH"
 echo "  Source: $SOURCE_DIR"
+echo "  Checksums: $CHECKSUM_PATH"
 echo "  Architectures: $(lipo -archs "$APP_BUNDLE/Contents/MacOS/DITRenamer")"
 echo "=================================================="

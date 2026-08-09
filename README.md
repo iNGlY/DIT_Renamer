@@ -27,7 +27,7 @@ DIT_Renamer/
 
 ## 构建
 
-需要 macOS 14 或更高版本、Apple Swift 编译器、Developer ID Application 证书，以及已保存到钥匙串的 notarytool profile。构建前建议对两个架构运行类型检查：
+需要 macOS 14 或更高版本和 Apple Swift 编译器。正式分发还需要 Developer ID Application 证书，以及已保存到钥匙串的 notarytool profile。构建前建议对两个架构运行类型检查：
 
 ```bash
 swiftc -typecheck -target arm64-apple-macosx14.0 $(find src_swift -name '*.swift' -print)
@@ -50,6 +50,16 @@ export DIT_RENAMER_NOTARY_PROFILE="DITRenamer-Notary"
 ```
 
 脚本会在构建前验证签名身份和 notarization profile，不会回退到 ad-hoc 签名。它会分别公证并 staple App 与 DMG，随后使用本机 Gatekeeper `spctl` 验证；只有全部步骤通过后才替换 `Release/`。发布镜像中不包含 `sudo xattr`、隔离属性清除命令或 Gatekeeper 绕过工具。
+
+缺少 Developer ID 时，可显式生成仅供 GitHub 预发布或内部测试的 universal ad-hoc 包：
+
+```bash
+DIT_RENAMER_RELEASE_MODE=adhoc ./scripts/build_swift_app.sh
+```
+
+该模式不会调用 notarization、staple 或 Gatekeeper 通过检查，资产名称会包含 `adhoc-unnotarized`，DMG 内也会明确标注风险。它不会成为静默回退路径；默认构建仍严格要求 Developer ID。由于 GitHub 下载会附带 quarantine 属性，ad-hoc 构建无法保证普通用户双击即开，不应标记为正式稳定版。
+
+GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.md`](docs/github_release_1.1.md)。完成 GitHub CLI 登录并配置 `origin` 后，可使用 `scripts/publish_github_release.sh` 校验资产、推送分支与 `v1.1.0` 标签，并创建 GitHub Pre-release。
 
 输出只写入项目内的 `build_swift/` 和 `Release/`，这两个目录属于生成物，不是源代码输入。
 
