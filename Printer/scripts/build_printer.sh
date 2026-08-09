@@ -4,16 +4,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="$PROJECT_ROOT/build_printer"
+BUILD_DIR="$PROJECT_ROOT/build"
 APP_BUNDLE="$BUILD_DIR/DIT Printer.app"
 APP_SOURCES=(
-    "$PROJECT_ROOT/src_printer/Shared/PrinterJob.swift"
-    "$PROJECT_ROOT/src_printer/Shared/RenamerAuditReader.swift"
-    "$PROJECT_ROOT/src_printer/PrintProfileStore.swift"
-    "$PROJECT_ROOT/src_printer/LabelTemplateStore.swift"
-    "$PROJECT_ROOT/src_printer/CUPSPrinter.swift"
-    "$PROJECT_ROOT/src_printer/PrintHistoryExporter.swift"
-    "$PROJECT_ROOT/src_printer/DITPrinterApp.swift"
+    "$PROJECT_ROOT/src/Shared/PrinterJob.swift"
+    "$PROJECT_ROOT/src/Shared/RenamerAuditReader.swift"
+    "$PROJECT_ROOT/src/PrintProfileStore.swift"
+    "$PROJECT_ROOT/src/LabelTemplateStore.swift"
+    "$PROJECT_ROOT/src/CUPSPrinter.swift"
+    "$PROJECT_ROOT/src/PrintHistoryExporter.swift"
+    "$PROJECT_ROOT/src/DITPrinterApp.swift"
 )
 
 mkdir -p "$BUILD_DIR" "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Helpers"
@@ -25,16 +25,16 @@ swiftc -parse-as-library -O -target arm64-apple-macosx14.0 \
 
 swiftc -O -target arm64-apple-macosx14.0 \
     -o "$APP_BUNDLE/Contents/Helpers/DITPrinterBridge" \
-    "$PROJECT_ROOT/src_printer/Shared/PrinterJob.swift" \
-    "$PROJECT_ROOT/src_printer/PrintProfileStore.swift" \
-    "$PROJECT_ROOT/src_printer/Shared/RenamerAuditReader.swift" \
-    "$PROJECT_ROOT/src_printer/DITPrinterBridge.swift"
+    "$PROJECT_ROOT/src/Shared/PrinterJob.swift" \
+    "$PROJECT_ROOT/src/PrintProfileStore.swift" \
+    "$PROJECT_ROOT/src/Shared/RenamerAuditReader.swift" \
+    "$PROJECT_ROOT/src/DITPrinterBridge.swift"
 
 swiftc -parse-as-library -O -target arm64-apple-macosx14.0 \
     -o "$APP_BUNDLE/Contents/Helpers/ParaShootEraseBridge" \
-    "$PROJECT_ROOT/src_printer/ParaShootEraseBridge.swift"
+    "$PROJECT_ROOT/src/ParaShootEraseBridge.swift"
 
-cp "$PROJECT_ROOT/src_printer/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+cp "$PROJECT_ROOT/src/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 codesign --force --deep --sign - "$APP_BUNDLE"
 
 echo "Built: $APP_BUNDLE"

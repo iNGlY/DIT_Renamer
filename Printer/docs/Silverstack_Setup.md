@@ -6,7 +6,7 @@ DIT Printer does not mount, rename, eject, verify, or delete camera media. The o
 
 ## Workflow
 
-Use `src_printer/Silverstack/DITPrinterAndParaShootAfterCopyVerify.lua` as the final post step of a Copy Job with Verify set to **Included**. Configure its input files in this order:
+Use `src/Silverstack/DITPrinterAndParaShootAfterCopyVerify.lua` as the final post step of a Copy Job with Verify set to **Included**. Configure its input files in this order:
 
 1. Source camera card
 2. Destination 1, verified by the same Copy Job
@@ -16,9 +16,9 @@ Silverstack calls the post step after the Copy Job and Verify finish successfull
 ## Build and install
 
 ```bash
-bash -n scripts/build_dit_printer.sh
-./scripts/build_dit_printer.sh
-open "build_printer/DIT Printer.app"
+bash -n scripts/build_printer.sh
+./scripts/build_printer.sh
+open "build/DIT Printer.app"
 ```
 
 Install `DIT Printer.app` in `/Applications` before enabling the Silverstack script. The script expects this helper path:
