@@ -143,8 +143,8 @@ and handoff context.
 - Follow-up/risk: No Developer ID or notarization was added by design. The first Sparkle-enabled build must be installed manually once, GitHub Pages must serve `docs/appcast.xml`, and the private EdDSA key must remain in the publisher keychain or a protected external file. Gatekeeper may still require manual approval for ad-hoc releases.
 
 ### 2026-08-10 — [codex] Finish 1.1.1 update release preparation
-- Commit: `pending`
+- Commit: `b28682e`
 - Branch: `codex/swift-1.1-hardening`
 - Changed: Sparkle update integration, universal build/release scripts, 1.1.1 GitHub release requirements and notes, appcast generation, README version links, and dynamic release copy.
-- Validation: Swift typecheck for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; Bash syntax checks; `git diff --check`; empty appcast input rejection; final universal ad-hoc build and signed appcast validation pending after commit.
+- Validation: Swift typecheck for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; Bash syntax checks; `git diff --check`; empty appcast input rejection; universal ad-hoc App/ZIP/DMG build; nested code-signature verification; `lipo -verify_arch`; Info.plist update-key inspection; SHA-256 verification; XML validation; and signed appcast generation with one ZIP enclosure.
 - Follow-up/risk: The free ad-hoc build still may require a one-time Gatekeeper approval. GitHub Pages and an actual 1.1.1 GitHub Release asset must exist before the public appcast can advertise this update.
