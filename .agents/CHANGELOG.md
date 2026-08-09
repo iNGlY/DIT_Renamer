@@ -113,3 +113,10 @@ and handoff context.
 - Changed: `scripts/build_swift_app.sh`, `scripts/publish_github_release.sh`, `docs/github_release_1.1.md`, `docs/github_release_notes_1.1.md`, `README.md`
 - Validation: Swift typecheck passed for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; both scripts passed macOS Bash syntax checks; invalid release modes fail before build; ad-hoc build produced universal App/ZIP/DMG; App, ZIP-extracted App, DMG-contained App, and DMG passed `codesign --verify`; `lipo -verify_arch arm64 x86_64` passed for every App copy; SHA-256 verification passed; mounted DMG contents and warning text were inspected; `spctl` rejected the unnotarized App as expected; publish script failed before mutation when GitHub authentication was absent.
 - Follow-up/risk: Public repository `iNGlY/DIT_Renamer` was created, the branch and annotated `v1.1.0` tag were pushed, and the DMG, ZIP, and checksum file were published as a GitHub Pre-release from commit `11227ce`. GitHub-reported asset digests match the local SHA-256 values. Developer ID signing and notarization remain required for a normal stable distribution.
+
+### 2026-08-09 — [codex] License DIT Renamer under Apache-2.0
+- Commit: `a89e5a6`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `LICENSE`, `NOTICE`, `README.md`, Swift entry/About attribution, release documentation, and release packaging scripts
+- Validation: `LICENSE` matched the official Apache License 2.0 text byte-for-byte after substituting the appendix copyright placeholder with `Copyright 2026 DIT247`; Swift typecheck passed for arm64 and x86_64; both release scripts passed macOS Bash syntax checks; `git diff --check` passed; GitHub default branch was pushed; `v1.1.0` notes were updated and `LICENSE`/`NOTICE` assets uploaded.
+- Follow-up/risk: The immutable `v1.1.0` tag still resolves to pre-license commit `11227ce`, so GitHub's automatic tag source archives do not contain the new legal files. The attached LICENSE/NOTICE and updated release notes state the license for the distributed assets; the next version tag must point to a commit containing `a89e5a6` or later.
