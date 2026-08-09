@@ -1,9 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>DIT Renamer</title>
         <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
         <description>DIT Renamer updates</description>
         <language>zh-cn</language>
+        <item>
+            <title>1.1.1</title>
+            <pubDate>Mon, 10 Aug 2026 03:02:45 +0800</pubDate>
+            <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
+            <sparkle:version>1110</sparkle:version>
+            <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.1.1/dit_renamer_Release_1.1.1-adhoc-unnotarized.zip" length="4142256" type="application/octet-stream" sparkle:edSignature="2oEb7VYEBgndmI4dV74erM0rSBFOATfTkEQ3DOjl5vuKI16i3Ka5qcpBWCVjGRdYdKh4mTEOW8oHXXxFkvYfAQ=="/>
+        </item>
     </channel>
 </rss>

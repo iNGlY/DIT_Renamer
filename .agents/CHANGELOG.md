@@ -155,3 +155,10 @@ and handoff context.
 - Changed: Bilingual `README.md`, public bilingual `CHANGELOG.md`, first-install instructions, and DMG `/Applications` shortcut validation.
 - Validation: arm64/x86_64 Swift typechecks; Bash syntax checks; `git diff --check`; clean universal ad-hoc build; strict App/Sparkle signature verification; SHA-256 checks; mounted-DMG inspection confirming `Applications -> /Applications`; main App launch smoke test; DIT Printer build/signature check; TSPL label renderer and Renamer audit reader fixture tests.
 - Follow-up/risk: The ad-hoc package remains unnotarized and may require one-time Gatekeeper approval. GitHub Release publication and GitHub Pages appcast deployment are still separate external steps.
+
+### 2026-08-10 — [codex] Publish 1.1.1 and signed appcast
+- Commit: `pending`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: Public `v1.1.1` GitHub Latest Release and signed `docs/appcast.xml` pointing to its ZIP update asset.
+- Validation: `gh auth status`; release asset SHA-256 comparison; `xmllint --noout docs/appcast.xml`; exactly one appcast item; EdDSA enclosure signature; temporary private key removed after generation.
+- Follow-up/risk: GitHub Pages must serve the repository `/docs` directory before installed Sparkle clients can fetch the feed. The release remains ad-hoc and unnotarized.
