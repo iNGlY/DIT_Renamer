@@ -136,15 +136,15 @@ struct AboutView: View {
             featureRow(
                 title: langManager.text("ARRIRAW / HDE 容量参考估算", "ARRIRAW / HDE Reference Estimate"),
                 desc: langManager.text(
-                    "对检测到的 ARRIRAW 内容提供基于固定模型的 HDE 容量参考估算，不代表最终编码结果。ARRI Reference Tool CMD 是独立工具；其 1.0.0 手册未提供仅估算 HDE 容量的命令，DIT Renamer 1.1 也不调用该工具。",
-                    "Provides a model-based HDE storage estimate for detected ARRIRAW media; it does not guarantee final encoded size. ARRI Reference Tool CMD is a separate tool whose 1.0.0 manual documents no size-only HDE estimate command, and DIT Renamer 1.1 does not invoke it."
+                    "对检测到的 ARRIRAW 内容提供基于固定模型的 HDE 容量参考估算，不调用外部处理工具，也不代表最终编码结果。",
+                    "Provides a model-based HDE storage estimate for detected ARRIRAW media without invoking an external processing tool or guaranteeing final encoded size."
                 )
             )
             featureRow(
                 title: langManager.text("原生 Swift 应用", "Native Swift Application"),
                 desc: langManager.text(
-                    "应用主体使用 Swift、SwiftUI 和 AppKit 实现；卷管理通过 macOS diskutil 完成，exiftool 是可选外部工具。ARRI Reference Tool CMD 不是 1.1 的运行依赖。",
-                    "The application is implemented with Swift, SwiftUI, and AppKit. Volume operations use macOS diskutil, and exiftool is optional. ARRI Reference Tool CMD is not a runtime dependency of version 1.1."
+                    "应用使用 Swift、SwiftUI 和 AppKit 构建，大部分功能实现代码由 AI 完成；卷管理通过 macOS diskutil 完成，exiftool 为可选工具。",
+                    "Built with Swift, SwiftUI, and AppKit, with most feature implementation code produced by AI. Volume operations use macOS diskutil, and exiftool is optional."
                 )
             )
         }

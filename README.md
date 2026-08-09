@@ -1,10 +1,11 @@
 # DIT Renamer 1.1
 
-DIT Renamer 是面向 macOS 现场 DIT 工作流的原生 Swift 应用，用于识别已挂载的可移除摄影机媒体、人工确认或按明确规则生成卷名，并记录可追溯的重命名审计信息。
+DIT Renamer 是基于 Swift 构建的 macOS 现场 DIT 工具，用于识别可移除摄影机媒体、生成卷名建议并记录重命名审计信息。大部分功能实现代码由 AI 完成。
+
+**下载当前版本：[DIT Renamer 1.1 Release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
 ## 运行边界
 
-- 产品实现为纯 Swift/AppKit/SwiftUI；Python、Web UI 和 PyInstaller 入口已废弃。
 - 只处理 macOS 报告为可移除且非内置的已挂载卷。
 - 在重命名前复核挂载路径、BSD 分区节点、Volume UUID，并在可用时复核 Media UUID。
 - 重命名成功后仅针对已复核的同一 BSD 分区执行强制卸载、重挂载和 UUID/卷名复核；操作前必须停止会持续访问该卷的任务。
@@ -59,7 +60,7 @@ DIT_RENAMER_RELEASE_MODE=adhoc ./scripts/build_swift_app.sh
 
 该模式不会调用 notarization、staple 或 Gatekeeper 通过检查，资产名称会包含 `adhoc-unnotarized`，DMG 内也会明确标注风险。它不会成为静默回退路径；默认构建仍严格要求 Developer ID。由于 GitHub 下载会附带 quarantine 属性，ad-hoc 构建无法保证普通用户双击即开，不应标记为正式稳定版。
 
-GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.md`](docs/github_release_1.1.md)。完成 GitHub CLI 登录并配置 `origin` 后，可使用 `scripts/publish_github_release.sh` 校验资产、推送分支与 `v1.1.0` 标签，并创建 GitHub Pre-release。
+GitHub 发布需求、发布说明和操作流程见 [`docs/github_release_1.1.md`](docs/github_release_1.1.md)。完成 GitHub CLI 登录并配置 `origin` 后，可使用 `scripts/publish_github_release.sh` 校验资产、推送分支与 `v1.1.0` 标签，并创建 GitHub Latest Release。
 
 输出只写入项目内的 `build_swift/` 和 `Release/`，这两个目录属于生成物，不是源代码输入。
 

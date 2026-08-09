@@ -4,7 +4,7 @@
 
 - Git 标签：`v1.1.0`
 - GitHub Release 标题：`DIT Renamer 1.1`
-- 当前无 Developer ID 的构建必须标记为 **Pre-release**。
+- 当前版本标记为 **Latest Release**，但未公证状态必须在资产名称、安装说明和 Release Notes 中明确展示。
 - 资产名称必须保留 `adhoc-unnotarized`，不得描述为已签名、公证、staple 或 Gatekeeper 验证通过。
 - 取得 Developer ID 并完成 notarization 后，使用相同源码重新构建正式资产，再创建或替换稳定发布。
 
@@ -55,7 +55,7 @@ DIT_RENAMER_RELEASE_MODE=adhoc ./scripts/build_swift_app.sh
 ./scripts/publish_github_release.sh
 ```
 
-发布脚本默认创建 **Pre-release**。它不会创建 GitHub 仓库，也不会决定仓库公开性。
+发布脚本默认创建 **Latest Release**。它不会创建 GitHub 仓库，也不会决定仓库公开性。
 
 ## 后续正式版要求
 

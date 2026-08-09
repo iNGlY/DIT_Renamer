@@ -14,9 +14,9 @@ DIT Renamer 1.1 是面向 macOS 14+ 现场 DIT 工作流的原生 Swift 应用�
 - `missingFiles: 0` 定义为校验通过；高置信度关联明细由用户选择是否输出。
 - 提供只读 Renamer 审计接口给独立的 DIT Printer；Printer 不包含在 1.1 应用包中。
 
-## 预发布限制
+## 分发限制
 
-本次 GitHub 资产仅使用 ad-hoc 签名，**没有 Apple Developer ID 签名或 notarization 票据**。macOS Gatekeeper 可能阻止直接启动，因此本版本标记为 Pre-release，不是“即开即用”的正式稳定分发版本。
+本次 GitHub 资产仅使用 ad-hoc 签名，**没有 Apple Developer ID 签名或 notarization 票据**。macOS Gatekeeper 可能阻止直接启动，因此当前 Latest Release 仍不能视为“即开即用”的正式签名分发版本。
 
 首次运行如被系统阻止，只应使用 macOS“系统设置 > 隐私与安全性”中可见的“仍要打开”流程。本项目不提供 `sudo xattr`、隔离属性清除脚本或自动绕过 Gatekeeper 的工具。
 
@@ -32,8 +32,8 @@ Copyright 2026 DIT247。项目采用 Apache License 2.0，商业使用和再分�
 
 ---
 
-DIT Renamer 1.1 is a native Swift application for macOS 14+ on-set DIT workflows. This prerelease contains a universal Apple Silicon and Intel build, safer volume identity checks, forced remount after rename, camera-media naming safeguards, Sony metadata detection, and localized read-only ParaShoot audit reports.
+DIT Renamer 1.1 is a native Swift application for macOS 14+ on-set DIT workflows. This release contains a universal Apple Silicon and Intel build, safer volume identity checks, forced remount after rename, camera-media naming safeguards, Sony metadata detection, and localized read-only ParaShoot audit reports.
 
-The attached assets are ad-hoc signed and **not Apple-notarized**. Gatekeeper may block direct launch, so this build is published as a prerelease. It does not include scripts that clear quarantine attributes or bypass Gatekeeper automatically.
+The attached assets are ad-hoc signed and **not Apple-notarized**. Gatekeeper may block direct launch even though this is the latest GitHub release. It does not include scripts that clear quarantine attributes or bypass Gatekeeper automatically.
 
 Licensed under Apache License 2.0. Commercial redistribution must retain the license, copyright notices, and the DIT247 attribution contained in `NOTICE`.

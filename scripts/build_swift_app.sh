@@ -60,7 +60,7 @@ if [[ "$RELEASE_MODE" == "developer-id" ]]; then
         --keychain-profile "$NOTARY_PROFILE" \
         --output-format json >/dev/null || fail "The notarytool profile is unavailable or could not authenticate."
 else
-    echo "[WARNING] Building an ad-hoc signed, unnotarized prerelease."
+    echo "[WARNING] Building an ad-hoc signed, unnotarized release."
     echo "[WARNING] Gatekeeper acceptance is not expected and this build is not suitable as a normal end-user release."
 fi
 
@@ -253,7 +253,7 @@ echo "=================================================="
 if [[ "$RELEASE_MODE" == "developer-id" ]]; then
     echo "[SUCCESS] Signed, notarized, stapled, Gatekeeper-verified release complete"
 else
-    echo "[SUCCESS] Ad-hoc signed, unnotarized prerelease complete"
+    echo "[SUCCESS] Ad-hoc signed, unnotarized release complete"
     echo "  WARNING: Gatekeeper acceptance is not expected."
 fi
 echo "  App: $APP_BUNDLE"

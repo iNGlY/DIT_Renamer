@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publishes the validated DIT Renamer 1.1 ad-hoc assets as a GitHub prerelease.
+# Publishes the validated DIT Renamer 1.1 ad-hoc assets as the latest GitHub release.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,7 +68,7 @@ gh release create "$TAG" \
     "$NOTICE_PATH" \
     --title "DIT Renamer 1.1" \
     --notes-file "$NOTES_PATH" \
-    --prerelease \
+    --latest \
     --verify-tag
 
-echo "[SUCCESS] GitHub prerelease $TAG published."
+echo "[SUCCESS] GitHub latest release $TAG published."
