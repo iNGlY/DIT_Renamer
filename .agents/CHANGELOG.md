@@ -106,3 +106,10 @@ and handoff context.
 - Changed: `src_swift/Views/AboutView.swift`, `docs/research_codex_device_manager_cli.md`
 - Validation: ARRI Reference Tool official product page, 1.0.0 manual, macOS universal package, `art-cmd --help`, HDE Transcoder page, and ARRI supporting-tools document checked; Swift typecheck and optimized executable compilation passed for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; `/bin/bash -n scripts/build_swift_app.sh`; `git diff --check`.
 - Follow-up/risk: Public ARRI materials do not confirm a CODEX Device Manager CLI or `codex-hde` command. Existing `MediaScanner.swift` and `MainDetailView.swift` still probe/display `codex-hde` and call the fixed 60% estimate an official model; changing that behavior requires user approval. ART CMD 1.0.0 reads/processes/verifies HDE input but does not document HDE output or a size-only estimate command.
+
+### 2026-08-09 — [codex] Add explicit ad-hoc GitHub prerelease flow
+- Commit: `eca1ba1`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `scripts/build_swift_app.sh`, `scripts/publish_github_release.sh`, `docs/github_release_1.1.md`, `docs/github_release_notes_1.1.md`, `README.md`
+- Validation: Swift typecheck passed for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; both scripts passed macOS Bash syntax checks; invalid release modes fail before build; ad-hoc build produced universal App/ZIP/DMG; App, ZIP-extracted App, DMG-contained App, and DMG passed `codesign --verify`; `lipo -verify_arch arm64 x86_64` passed for every App copy; SHA-256 verification passed; mounted DMG contents and warning text were inspected; `spctl` rejected the unnotarized App as expected; publish script failed before mutation when GitHub authentication was absent.
+- Follow-up/risk: The generated ad-hoc assets are explicitly named `adhoc-unnotarized` and must remain a GitHub Pre-release. GitHub CLI 2.97.0 is installed but not authenticated, and this repository has no `origin`; no tag, push, repository, or GitHub Release has been created. Developer ID signing and notarization remain required for a normal stable distribution.
