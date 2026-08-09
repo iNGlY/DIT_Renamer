@@ -18,7 +18,7 @@ struct AboutView: View {
                         Text("DIT Renamer")
                             .font(.title2)
                             .fontWeight(.bold)
-                        Text("Release 1.0.1")
+                        Text("Release 1.1")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .padding(.horizontal, 8)

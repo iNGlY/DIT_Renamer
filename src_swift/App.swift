@@ -52,7 +52,11 @@ struct DITRenamerApp: App {
                     Divider()
                     
                     // Main Workspace (Responsive Glass)
-                    MainDetailView(volume: selectedVolume, isAutoRenameEnabled: $isAutoRenameEnabled)
+                    MainDetailView(
+                        volume: $selectedVolume,
+                        monitor: volumeMonitor,
+                        isAutoRenameEnabled: $isAutoRenameEnabled
+                    )
                     
                     Divider()
                     

@@ -2,7 +2,8 @@ import SwiftUI
 
 struct MainDetailView: View {
     @ObservedObject var langManager = LanguageManager.shared
-    var volume: MountedVolume?
+    @Binding var volume: MountedVolume?
+    @ObservedObject var monitor: VolumeMonitor
     @Binding var isAutoRenameEnabled: Bool
     
     public static var autoRenamedSessionNodes: Set<String> = []
@@ -10,9 +11,11 @@ struct MainDetailView: View {
     @AppStorage("renameHistoryData") private var historyData: Data = Data()
     
     @State private var scanResult: ScanResult? = nil
+    @State private var scanVolumeID: String? = nil
     @State private var selectedLetter: String = "A"
     @State private var rollInput: String = "001"
     @State private var reuseInput: String = "0"
+    @State private var includeDetectedSuffix: Bool = true
     @State private var alertMessage: String? = nil
     @State private var isRenaming = false
     @State private var isSuspiciousWarning = false
@@ -37,7 +40,7 @@ struct MainDetailView: View {
         let reuse = Int(reuseInput) ?? 0
         var name = "\(selectedLetter)\(rollInput)"
         if reuse > 0 { name += "-\(reuse)" }
-        if let suffix = scanResult?.suffix { name += suffix }
+        if includeDetectedSuffix, let suffix = scanResult?.suffix { name += suffix }
         return name
     }
 
@@ -49,7 +52,7 @@ struct MainDetailView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     Spacer()
-                    Text("Release 1.0.1")
+                    Text("Release 1.1")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .padding(.horizontal, 6)
@@ -89,8 +92,13 @@ struct MainDetailView: View {
                 if scanResult?.isUnconfiguredCamera == true {
                     UnconfiguredCameraBannerView()
                 }
+
+                // Banner 2: Optional exiftool installation notice
+                if scanResult?.needsExifToolInstallation == true {
+                    ExifToolInstallationBannerView()
+                }
                 
-                // Banner 2: Empty Card Info Banner
+                // Banner 3: Empty Card Info Banner
                 if scanResult?.isEmptyCard == true {
                     HStack(spacing: 8) {
                         Image(systemName: "tray")
@@ -105,7 +113,7 @@ struct MainDetailView: View {
                     .cornerRadius(8)
                 }
                 
-                // Banner 3: Photo Only Card Info Banner
+                // Banner 4: Photo Only Card Info Banner
                 if scanResult?.isPhotoOnly == true {
                     PhotoCardBannerView(photoCount: scanResult?.photoCount ?? 0)
                 }
@@ -189,7 +197,7 @@ struct MainDetailView: View {
                                 }
                             }
                             Spacer()
-                            Text(scanResult?.suggestedName ?? "A001")
+                            Text(scanResult?.suggestedName ?? langManager.text("待人工确认", "Manual confirmation required"))
                                 .font(.system(.title3, design: .monospaced))
                                 .fontWeight(.bold)
                                 .foregroundColor(.blue)
@@ -256,6 +264,25 @@ struct MainDetailView: View {
                                             .font(.system(.body, design: .monospaced))
                                     }
                                 }
+                            }
+
+                            if let suffix = scanResult?.suffix {
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(langManager.text("素材后缀", "MEDIA SUFFIX"))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Text(suffix)
+                                            .font(.system(.body, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Toggle("", isOn: $includeDetectedSuffix)
+                                        .toggleStyle(.switch)
+                                        .controlSize(.small)
+                                        .help(langManager.text("在建议卷名中保留扫描到的素材后缀", "Keep the detected media suffix in the suggested volume name"))
+                                }
+                                .padding(.top, 2)
                             }
                         }
                         .padding(12)
@@ -325,27 +352,9 @@ struct MainDetailView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: volume) { newVol in
-            if let v = newVol {
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let result = MediaScanner.scan(volumePath: v.path)
-                    DispatchQueue.main.async {
-                        self.scanResult = result
-                        if let letter = result.cameraLetter { self.selectedLetter = letter }
-                        if let roll = result.rollNumber { self.rollInput = roll }
-                        
-                        if self.isAutoRenameEnabled && (!result.isHighConfidence || !v.isGenericName) {
-                            self.isSuspiciousWarning = true
-                        } else {
-                            self.isSuspiciousWarning = false
-                        }
-                        
-                        self.checkAndAutoRename()
-                    }
-                }
-            }
-        }
-        .onChange(of: isAutoRenameEnabled) { enabled in
+        .onAppear { startScan(for: volume) }
+        .onChange(of: volume) { _, newVol in startScan(for: newVol) }
+        .onChange(of: isAutoRenameEnabled) { _, enabled in
             if enabled {
                 self.checkAndAutoRename()
             }
@@ -374,6 +383,10 @@ struct MainDetailView: View {
     
     private func executeRename() {
         guard let vol = volume else { return }
+        guard scanResult != nil, scanVolumeID == vol.id else {
+            activeAlert = .resultNotice(message: langManager.text("请等待当前卡片扫描完成后再重命名。", "Wait for the selected volume scan to finish before renaming."))
+            return
+        }
         if vol.isUniqueCameraName {
             activeAlert = .confirmForce(volName: vol.name)
             return
@@ -383,10 +396,12 @@ struct MainDetailView: View {
     
     private func checkAndAutoRename() {
         guard let v = volume, let result = scanResult else { return }
+        guard !isRenaming, scanVolumeID == v.id, result.isScanComplete else { return }
         
         let targetName = previewNewName
         let alreadyInHistory = RenameHistoryStore.shared.items.contains { record in
-            record.newName == targetName && (result.firstClipName == nil || record.firstClipName == result.firstClipName)
+            record.newName == targetName && (record.volumeUUID == v.volumeUUID ||
+                (record.volumeUUID == nil && (result.firstClipName == nil || record.firstClipName == result.firstClipName)))
         }
         
         if isAutoRenameEnabled
@@ -396,6 +411,7 @@ struct MainDetailView: View {
             && !result.isEmptyCard
             && !result.isPhotoOnly
             && !result.isUnformattedCard
+            && result.suggestedName != nil
             && !alreadyInHistory {
             
             performRename()
@@ -404,21 +420,75 @@ struct MainDetailView: View {
     
     private func performRename() {
         guard let vol = volume else { return }
+        guard !isRenaming, let result = scanResult, scanVolumeID == vol.id else { return }
+        guard vol.volumeUUID != nil else {
+            activeAlert = .resultNotice(message: langManager.text("未能确认卡片 UUID，已取消重命名。", "The card UUID could not be verified; rename cancelled."))
+            return
+        }
         isRenaming = true
         let oldName = vol.name
         let newName = previewNewName
+        let volumeSnapshot = vol
+        let scanSnapshot = result
         
-        RenamerEngine.renameVolume(at: vol.path, bsdNode: vol.bsdNode, fileSystem: vol.fileSystem, to: newName) { success, msg in
+        RenamerEngine.renameVolume(
+            at: volumeSnapshot.path,
+            bsdNode: volumeSnapshot.bsdNode,
+            volumeUUID: volumeSnapshot.volumeUUID,
+            mediaUUID: volumeSnapshot.mediaUUID,
+            fileSystem: volumeSnapshot.fileSystem,
+            to: newName
+        ) { success, msg, actualName in
             isRenaming = false
-            if success {
-                saveHistoryItem(oldName: oldName, newName: newName)
+            if let actualName {
+                let persisted = saveHistoryItem(
+                    oldName: oldName,
+                    requestedName: newName,
+                    actualName: actualName,
+                    volume: volumeSnapshot,
+                    scan: scanSnapshot
+                )
+                if !persisted {
+                    activeAlert = .resultNotice(message: langManager.text("卷已重命名，但审计记录保存失败，请立即手动记录并检查权限。", "The volume was renamed, but the audit record could not be saved. Record it manually and check permissions."))
+                    return
+                }
+                volume = nil
+                monitor.refreshVolumes()
             }
             activeAlert = .resultNotice(message: msg)
         }
     }
     
-    private func saveHistoryItem(oldName: String, newName: String) {
-        guard let vol = volume else { return }
+    private func startScan(for selectedVolume: MountedVolume?) {
+        scanResult = nil
+        scanVolumeID = selectedVolume?.id
+        includeDetectedSuffix = true
+        isSuspiciousWarning = false
+        guard let selectedVolume else { return }
+
+        let volumeID = selectedVolume.id
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = MediaScanner.scan(volumePath: selectedVolume.path)
+            DispatchQueue.main.async {
+                guard self.volume?.id == volumeID, self.scanVolumeID == volumeID else { return }
+                self.scanResult = result
+                if let letter = result.cameraLetter { self.selectedLetter = letter }
+                if let roll = result.rollNumber { self.rollInput = roll }
+                self.isSuspiciousWarning = self.isAutoRenameEnabled &&
+                    (!result.isHighConfidence || !selectedVolume.isGenericName)
+                self.checkAndAutoRename()
+            }
+        }
+    }
+
+    @discardableResult
+    private func saveHistoryItem(
+        oldName: String,
+        requestedName: String,
+        actualName: String,
+        volume vol: MountedVolume,
+        scan scanResult: ScanResult
+    ) -> Bool {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let todayStr = formatter.string(from: Date())
@@ -426,23 +496,29 @@ struct MainDetailView: View {
         let item = RenameHistoryItem(
             id: UUID(),
             originalName: oldName,
-            newName: newName,
-            firstClipName: scanResult?.firstClipName,
-            lastClipName: scanResult?.lastClipName,
-            clipCount: scanResult?.clipCount ?? 0,
-            totalFileCount: scanResult?.totalFileCount ?? 0,
+            newName: actualName,
+            firstClipName: scanResult.firstClipName,
+            lastClipName: scanResult.lastClipName,
+            clipCount: scanResult.clipCount,
+            totalFileCount: scanResult.totalFileCount,
             usedSpace: vol.usedGBFormatted,
-            deviceType: scanResult?.deviceType ?? "Generic",
+            deviceType: scanResult.deviceType,
             timestamp: Date(),
             dateDayString: todayStr,
-            isUnformatted: scanResult?.isUnformattedCard ?? false,
-            isEmptyCard: scanResult?.isEmptyCard ?? false
+            isUnformatted: scanResult.isUnformattedCard,
+            isEmptyCard: scanResult.isEmptyCard,
+            requestedName: requestedName,
+            volumeUUID: vol.volumeUUID,
+            mediaUUID: vol.mediaUUID,
+            bsdNode: vol.bsdNode,
+            mountedPath: vol.path
         )
         
-        RenameHistoryStore.shared.add(item)
+        guard RenameHistoryStore.shared.add(item) else { return false }
         if let encoded = try? JSONEncoder().encode(RenameHistoryStore.shared.items) {
             historyData = encoded
         }
+        return true
     }
 }
 
@@ -571,6 +647,41 @@ struct UnconfiguredCameraBannerView: View {
         .background(Color.orange.opacity(0.12))
         .cornerRadius(8)
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.orange.opacity(0.3), lineWidth: 1))
+    }
+}
+
+struct ExifToolInstallationBannerView: View {
+    @ObservedObject var langManager = LanguageManager.shared
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "wrench.and.screwdriver.fill")
+                .foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(langManager.text(
+                    "XML/XMP 未提供明确机型；可选的 exiftool 回退识别尚未安装。现有卷名判断不受影响。",
+                    "XML/XMP did not provide an explicit camera model, and optional exiftool fallback detection is not installed. Existing volume-name decisions are unaffected."
+                ))
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.blue)
+
+                Text(langManager.text(
+                    "手动安装：brew install exiftool；或访问 exiftool.org。",
+                    "Install manually: brew install exiftool, or visit exiftool.org."
+                ))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
+                Link(langManager.text("打开 exiftool 官方安装页", "Open the exiftool installation page"), destination: URL(string: "https://exiftool.org/")!)
+                    .font(.caption2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(Color.blue.opacity(0.10))
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue.opacity(0.3), lineWidth: 1))
     }
 }
 

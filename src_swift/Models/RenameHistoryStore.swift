@@ -9,6 +9,8 @@ public class RenameHistoryStore: ObservableObject {
     public static let shared = RenameHistoryStore()
     
     @Published public private(set) var items: [RenameHistoryItem] = []
+    @Published public private(set) var lastPersistenceError: String?
+    @Published public private(set) var lastPrinterExportError: String?
     
     private let fileManager = FileManager.default
     private let appSupportDir: URL
@@ -41,16 +43,37 @@ public class RenameHistoryStore: ObservableObject {
             if let legacyData = UserDefaults.standard.data(forKey: "renameHistoryData"),
                let legacyItems = try? JSONDecoder().decode([RenameHistoryItem].self, from: legacyData) {
                 self.items = legacyItems
-                saveHistory()
+                _ = saveHistory()
             }
         }
+        exportPrinterAudit()
     }
     
     /// 添加一条新的重命名记录
-    public func add(_ item: RenameHistoryItem) {
+    @discardableResult
+    public func add(_ item: RenameHistoryItem) -> Bool {
+        lastPersistenceError = nil
         items.insert(item, at: 0)
-        saveHistory()
-        appendLogText(item: item)
+        guard saveHistory() else {
+            items.removeFirst()
+            return false
+        }
+        let logSaved = appendLogText(item: item)
+        exportPrinterAudit()
+        guard logSaved else {
+            lastPersistenceError = "重命名已保存，但审计日志写入失败。"
+            return false
+        }
+        return true
+    }
+
+    private func exportPrinterAudit() {
+        do {
+            try RenamerPrinterAuditExport.write(items, fileManager: fileManager)
+            lastPrinterExportError = nil
+        } catch {
+            lastPrinterExportError = "Printer 审计导出失败：\(error.localizedDescription)"
+        }
     }
     
     /// 判断某张卡/某个卷名是否已经在本软件中成功重命名过
@@ -64,26 +87,47 @@ public class RenameHistoryStore: ObservableObject {
         }
     }
     
-    private func saveHistory() {
-        if let data = try? JSONEncoder().encode(items) {
-            try? data.write(to: jsonFileURL, options: .atomic)
-            // 同步写回 UserDefaults 备用
+    private func saveHistory() -> Bool {
+        guard let data = try? JSONEncoder().encode(items) else {
+            lastPersistenceError = "重命名历史无法编码，审计记录未保存。"
+            return false
+        }
+        do {
+            try data.write(to: jsonFileURL, options: .atomic)
             UserDefaults.standard.set(data, forKey: "renameHistoryData")
+            return true
+        } catch {
+            lastPersistenceError = "重命名历史保存失败：\(error.localizedDescription)"
+            return false
         }
     }
     
-    private func appendLogText(item: RenameHistoryItem) {
+    private func appendLogText(item: RenameHistoryItem) -> Bool {
         let line = "[\(item.dateDayString) \(item.formattedTime)] RENAMED '\(item.originalName)' -> '\(item.newName)' | Clips: \(item.clipCount), Files: \(item.totalFileCount), Space: \(item.usedSpace), Device: \(item.deviceType)\n"
         if let data = line.data(using: .utf8) {
             if fileManager.fileExists(atPath: logFileURL.path) {
                 if let fileHandle = try? FileHandle(forWritingTo: logFileURL) {
-                    fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
-                    try? fileHandle.close()
+                    do {
+                        try fileHandle.seekToEnd()
+                        try fileHandle.write(contentsOf: data)
+                        try fileHandle.close()
+                        return true
+                    } catch {
+                        lastPersistenceError = "审计日志关闭失败：\(error.localizedDescription)"
+                        return false
+                    }
                 }
             } else {
-                try? data.write(to: logFileURL, options: .atomic)
+                do {
+                    try data.write(to: logFileURL, options: .atomic)
+                    return true
+                } catch {
+                    lastPersistenceError = "审计日志写入失败：\(error.localizedDescription)"
+                    return false
+                }
             }
         }
+        lastPersistenceError = "审计日志无法编码。"
+        return false
     }
 }

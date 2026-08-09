@@ -1,11 +1,11 @@
 #!/bin/bash
-# DIT Renamer Release 1.0.1 一键编译打包、签名与 DMG 生成脚本
+# DIT Renamer Release 1.1 一键编译打包、签名与 DMG 生成脚本
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RELEASE_DIR="$PROJECT_ROOT/Release"
-VERSION="1.0.1"
+VERSION="1.1"
 APP_NAME="dit_renamer_Release_${VERSION}"
 APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
 DMG_NAME="dit_renamer_Release_${VERSION}.dmg"
@@ -21,9 +21,6 @@ echo "[CLEAN] 正在结束运行进程并清理旧版本..."
 killall DITRenamer 2>/dev/null || true
 killall "DIT Renamer" 2>/dev/null || true
 
-rm -rf "$HOME/Downloads/dit_renamer"*".app" "$HOME/Downloads/dit_renamer"*".zip" "$HOME/Downloads/dit_renamer"*".dmg"
-rm -rf "$HOME/Downloads/DIT Renamer.app" "$HOME/Downloads/DIT_Renamer.dmg"
-rm -rf "/Applications/DIT Renamer.app"
 rm -rf "$RELEASE_DIR"/*
 
 mkdir -p "$RELEASE_DIR"

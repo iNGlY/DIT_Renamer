@@ -1,9 +1,21 @@
 import Foundation
 
 public class MediaScanner {
+    private static let exifToolCandidates = [
+        "/opt/homebrew/bin/exiftool",
+        "/usr/local/bin/exiftool"
+    ]
+
+    public static var exifToolPath: String? {
+        exifToolCandidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
     public static func scan(volumePath: String) -> ScanResult {
         let fm = FileManager.default
         let url = URL(fileURLWithPath: volumePath)
+        let shouldInspectCameraMetadata = UserDefaults.standard.object(forKey: "enableExifToolModelDetection") as? Bool ?? true
+        let hasSonyStructure = fm.fileExists(atPath: url.appendingPathComponent("PRIVATE/M4ROOT").path)
+            || fm.fileExists(atPath: url.appendingPathComponent("M4ROOT").path)
         
         guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.nameKey, .isDirectoryKey, .contentModificationDateKey], options: [.skipsHiddenFiles]) else {
             return ScanResult(
@@ -23,6 +35,8 @@ public class MediaScanner {
         var hasRdcFolder: Bool = false
         var hasRdmFolder: Bool = false
         var totalFileCount: Int = 0
+        var metadataCandidateURL: URL?
+        var sonyMetadataSidecars: [URL] = []
         
         var earliestDate: Date? = nil
         var latestDate: Date? = nil
@@ -32,6 +46,7 @@ public class MediaScanner {
         
         var arriRawBytes: Int64 = 0
         var nonRawBytes: Int64 = 0
+        var scanTruncated = false
         
         for case let fileURL as URL in enumerator {
             let name = fileURL.lastPathComponent
@@ -50,9 +65,20 @@ public class MediaScanner {
             } else {
                 totalFileCount += 1
                 let fSize = Int64((try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+
+                if hasSonyStructure,
+                   sonyMetadataSidecars.count < 20,
+                   (ext == "xml" || ext == "xmp"),
+                   fSize > 0,
+                   fSize <= 1_048_576 {
+                    sonyMetadataSidecars.append(fileURL)
+                }
                 
                 if videoExts.contains(ext) {
                     videoClips.append(name)
+                    if metadataCandidateURL == nil || (ext == "mp4" && metadataCandidateURL?.pathExtension.lowercased() != "mp4") {
+                        metadataCandidateURL = fileURL
+                    }
                     if ext == "braw" { hasBraw = true }
                     if ext == "nev" { hasNev = true }
                     if ext == "r3d" { hasR3d = true }
@@ -79,12 +105,27 @@ public class MediaScanner {
                 }
             }
             
-            if totalFileCount > 5000 { break }
+            if totalFileCount > 5000 {
+                scanTruncated = true
+                break
+            }
         }
         
         videoClips.sort()
         let firstClip = videoClips.first
         let lastClip = videoClips.last
+        let sonyModelFromSidecars = hasSonyStructure
+            ? detectSonyModel(fromSidecars: sonyMetadataSidecars)
+            : nil
+        let needsExifToolInstallation = hasSonyStructure
+            && sonyModelFromSidecars == nil
+            && shouldInspectCameraMetadata
+            && metadataCandidateURL != nil
+            && exifToolPath == nil
+        let sonyModel = sonyModelFromSidecars
+            ?? (hasSonyStructure && shouldInspectCameraMetadata
+                ? detectSonyModel(from: metadataCandidateURL)
+                : nil)
         
         // Calculate date span for unformatted card check
         var dateSpanDays: Int = 0
@@ -139,7 +180,8 @@ public class MediaScanner {
                     totalFileCount: totalFileCount,
                     firstClipName: firstClip,
                     lastClipName: lastClip,
-                    isHighConfidence: true
+                    isHighConfidence: false,
+                    isScanComplete: !scanTruncated
                 )
             }
         }
@@ -150,17 +192,19 @@ public class MediaScanner {
             
             // A. DEFENSE: Check for Sony Default Unconfigured Clip Name (e.g., C0001.MP4, C0042.MOV)
             let unconfiguredRegex = try? NSRegularExpression(pattern: "^C\\d{4}\\.", options: [.caseInsensitive])
-            if unconfiguredRegex?.firstMatch(in: first, options: [], range: range) != nil {
+            if hasSonyStructure,
+               unconfiguredRegex?.firstMatch(in: first, options: [], range: range) != nil {
                 let isUnformatted = dateSpanDays >= 1
                 return ScanResult(
                     suggestedName: nil, cameraLetter: nil, rollNumber: nil, suffix: nil,
-                    deviceType: "Sony (Unconfigured Camera ID)",
+                    deviceType: sonyModel.map { "Sony \($0) (Unconfigured Camera ID)" } ?? "Sony (Unconfigured Camera ID)",
                     clipCount: videoClips.count, totalFileCount: totalFileCount,
                     firstClipName: firstClip, lastClipName: lastClip,
                     isHighConfidence: false, isUnconfiguredCamera: true,
                     isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
                     isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
-                    earliestDateStr: earliestDateStr, latestDateStr: latestDateStr
+                    earliestDateStr: earliestDateStr, latestDateStr: latestDateStr,
+                    needsExifToolInstallation: needsExifToolInstallation
                 )
             }
             
@@ -174,13 +218,14 @@ public class MediaScanner {
                 
                 return ScanResult(
                     suggestedName: suggested, cameraLetter: camera, rollNumber: roll, suffix: nil,
-                    deviceType: "Sony FX Cinema",
+                    deviceType: sonyModel.map { "Sony \($0)" } ?? "Sony FX Cinema",
                     clipCount: videoClips.count, totalFileCount: totalFileCount,
                     firstClipName: firstClip, lastClipName: lastClip,
-                    isHighConfidence: true, isUnconfiguredCamera: false,
+                    isHighConfidence: hasSonyStructure && !scanTruncated, isUnconfiguredCamera: false,
                     isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
                     isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
-                    earliestDateStr: earliestDateStr, latestDateStr: latestDateStr
+                    earliestDateStr: earliestDateStr, latestDateStr: latestDateStr,
+                    needsExifToolInstallation: needsExifToolInstallation
                 )
             }
             
@@ -208,7 +253,8 @@ public class MediaScanner {
                     deviceType: devName,
                     clipCount: videoClips.count, totalFileCount: totalFileCount,
                     firstClipName: firstClip, lastClipName: lastClip,
-                    isHighConfidence: true, isUnconfiguredCamera: false,
+                    // The filename alone is not enough to identify a camera model.
+                    isHighConfidence: false, isUnconfiguredCamera: false,
                     isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
                     isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
                     earliestDateStr: earliestDateStr, latestDateStr: latestDateStr
@@ -218,19 +264,21 @@ public class MediaScanner {
             // D. Native RED Digital Cinema (Contains .RDC or .RDM folders)
             if hasRdcFolder || hasRdmFolder {
                 let redRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_", options: [])
-                var camera = "A"
-                var roll = "001"
+                var camera: String?
+                var roll: String?
                 if let match = redRegex?.firstMatch(in: first, options: [], range: range) {
                     camera = String(first[Range(match.range(at: 1), in: first)!])
                     roll = String(first[Range(match.range(at: 2), in: first)!])
                 }
                 let isUnformatted = dateSpanDays >= 2
                 return ScanResult(
-                    suggestedName: "\(camera)\(roll)", cameraLetter: camera, rollNumber: roll, suffix: nil,
+                    suggestedName: camera.flatMap { letter in roll.map { "\(letter)\($0)" } },
+                    cameraLetter: camera, rollNumber: roll, suffix: nil,
                     deviceType: "RED Digital Cinema",
                     clipCount: videoClips.count, totalFileCount: totalFileCount,
                     firstClipName: firstClip, lastClipName: lastClip,
-                    isHighConfidence: true, isUnconfiguredCamera: false,
+                    // RDC/RDM proves a RED media structure, not the Camera ID or Reel.
+                    isHighConfidence: false, isUnconfiguredCamera: false,
                     isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
                     isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
                     earliestDateStr: earliestDateStr, latestDateStr: latestDateStr
@@ -252,7 +300,8 @@ public class MediaScanner {
                     deviceType: device,
                     clipCount: videoClips.count, totalFileCount: totalFileCount,
                     firstClipName: firstClip, lastClipName: lastClip,
-                    isHighConfidence: true, isUnconfiguredCamera: false,
+                    // Generic A001_ names are shared by several camera families.
+                    isHighConfidence: false, isUnconfiguredCamera: false,
                     isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
                     isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
                     earliestDateStr: earliestDateStr, latestDateStr: latestDateStr,
@@ -265,16 +314,129 @@ public class MediaScanner {
         let fallbackDevice = hasBraw ? "Blackmagic Design" : "Generic Media"
         let fallbackHde = HDECalculator.calculateHDE(volumePath: volumePath, hasAri: hasAri, deviceType: fallbackDevice, arriRawBytes: arriRawBytes, nonRawBytes: nonRawBytes)
         return ScanResult(
-            suggestedName: "A001", cameraLetter: "A", rollNumber: "001", suffix: nil,
-            deviceType: fallbackDevice,
+            suggestedName: nil, cameraLetter: nil, rollNumber: nil, suffix: nil,
+            deviceType: "Unrecognized Media",
             clipCount: videoClips.count, totalFileCount: totalFileCount,
             firstClipName: firstClip, lastClipName: lastClip,
             isHighConfidence: false, isUnconfiguredCamera: false,
             isEmptyCard: false, isPhotoOnly: false, photoCount: 0,
             isUnformattedCard: isUnformatted, dateSpanDays: dateSpanDays,
             earliestDateStr: earliestDateStr, latestDateStr: latestDateStr,
-            hdeResult: fallbackHde
+            hdeResult: fallbackHde,
+            isScanComplete: !scanTruncated,
+            needsExifToolInstallation: needsExifToolInstallation
         )
+    }
+
+    private static func detectSonyModel(fromSidecars sidecars: [URL]) -> String? {
+        for sidecar in sidecars {
+            guard let handle = try? FileHandle(forReadingFrom: sidecar) else { continue }
+            defer { try? handle.close() }
+
+            let data = (try? handle.read(upToCount: 262_144)) ?? Data()
+            guard let metadata = String(data: data, encoding: .utf8) else { continue }
+            if let model = explicitSonyModelValue(in: metadata) {
+                return model
+            }
+        }
+        return nil
+    }
+
+    private static func detectSonyModel(from fileURL: URL?) -> String? {
+        guard let fileURL, let exifToolPath else { return nil }
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: exifToolPath)
+        task.arguments = [
+            "-fast2", "-s",
+            "-Make", "-Model", "-CameraModelName", "-XMP:Model", "-QuickTime:Model",
+            "--", fileURL.path
+        ]
+        let output = Pipe()
+        task.standardOutput = output
+        task.standardError = Pipe()
+
+        let completion = DispatchSemaphore(value: 0)
+        task.terminationHandler = { _ in completion.signal() }
+        do {
+            try task.run()
+        } catch {
+            return nil
+        }
+
+        guard completion.wait(timeout: .now() + 2) == .success else {
+            task.terminate()
+            _ = completion.wait(timeout: .now() + 0.25)
+            return nil
+        }
+        guard task.terminationStatus == 0,
+              let metadata = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) else {
+            return nil
+        }
+
+        return explicitSonyModelValue(in: metadata)
+    }
+
+    private static func explicitSonyModelValue(in metadata: String) -> String? {
+        if let identifier = sonyModelIdentifier(in: metadata) {
+            return identifier
+        }
+
+        let xmlPattern = "<(?:[A-Z0-9_-]+:)?(?:CAMERAMODEL(?:NAME)?|DEVICEMODEL(?:NAME)?|MODEL(?:NAME)?)\\b[^>]*>\\s*([^<]{1,80})"
+        if let expression = try? NSRegularExpression(pattern: xmlPattern, options: [.caseInsensitive]),
+           let match = expression.firstMatch(
+               in: metadata,
+               options: [],
+               range: NSRange(location: 0, length: metadata.utf16.count)
+           ),
+           let range = Range(match.range(at: 1), in: metadata),
+           let model = readableSonyModel(String(metadata[range])) {
+            return model
+        }
+
+        for line in metadata.components(separatedBy: .newlines) {
+            let parts = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2,
+                  parts[0].uppercased().contains("MODEL") else { continue }
+
+            if let model = readableSonyModel(String(parts[1])) {
+                return model
+            }
+        }
+        return nil
+    }
+
+    private static func readableSonyModel(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.count <= 80,
+              trimmed.range(of: "^[A-Za-z0-9][A-Za-z0-9 ._-]*$", options: .regularExpression) != nil else {
+            return nil
+        }
+        return sonyModelIdentifier(in: trimmed) ?? trimmed
+    }
+
+    private static func sonyModelIdentifier(in metadata: String) -> String? {
+        let normalized = metadata.uppercased()
+        let pattern = "(?<![A-Z0-9-])(?:ILME|ILCE|ILCA|PXW|HXR|FDR|HDR|DSC|NEX|SLT|MPC)-[A-Z0-9]+(?:-[A-Z0-9]+)*(?![A-Z0-9-])"
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(
+                in: normalized,
+                options: [],
+                range: NSRange(location: 0, length: normalized.utf16.count)
+              ),
+              let range = Range(match.range, in: normalized) else {
+            return nil
+        }
+
+        let identifier = String(normalized[range])
+        if identifier.hasPrefix("ILME-") {
+            return String(identifier.dropFirst("ILME-".count))
+        }
+        if identifier.hasPrefix("ILCE-") || identifier.hasPrefix("ILCA-") {
+            return "A" + String(identifier.dropFirst(5))
+        }
+        return identifier
     }
     
     public static func isARRIRAWFile(fileURL: URL) -> Bool {

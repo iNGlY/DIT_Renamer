@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-09T00:00:00Z",
+  "records": [
+    {
+      "rename_id": "11111111-1111-1111-1111-111111111111",
+      "renamed_at": "2026-08-09T00:00:00Z",
+      "original_name": "Untitled",
+      "actual_name": "A001",
+      "requested_name": "A001",
+      "volume_uuid": "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+      "media_uuid": "11111111-2222-3333-4444-555555555555",
+      "bsd_node": "disk4s1",
+      "recorded_mount_path": "/Volumes/Untitled",
+      "device_type": "Sony FX3",
+      "first_clip_name": "A001C001_240101AA.MP4",
+      "last_clip_name": "A001C012_240101AA.MP4",
+      "clip_count": 12
+    }
+  ]
+}

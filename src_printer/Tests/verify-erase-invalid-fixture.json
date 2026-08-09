@@ -1,0 +1,6 @@
+{
+  "job_id": "verify-erase-negative-test",
+  "card_path": "/private/tmp",
+  "verified_destination_path": "/private/tmp",
+  "verified_at": "2026-08-09T12:34:56Z"
+}

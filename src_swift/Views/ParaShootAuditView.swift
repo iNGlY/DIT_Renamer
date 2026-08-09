@@ -143,10 +143,21 @@ struct ParaShootAuditView: View {
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.pdf]
         savePanel.nameFieldStringValue = "ParaShoot_Audit_\(report.date).pdf"
+        let associationOption = NSButton(
+            checkboxWithTitle: lang == .zh ? "导出高置信度关联结果" : "Export high-confidence associations",
+            target: nil,
+            action: nil
+        )
+        associationOption.state = .off
+        savePanel.accessoryView = associationOption
         
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                ParaShootPDFGenerator.shared.generatePDF(for: report, language: lang) { data in
+                ParaShootPDFGenerator.shared.generatePDF(
+                    for: report,
+                    language: lang,
+                    includeHighConfidenceAssociation: associationOption.state == .on
+                ) { data in
                     if let data = data {
                         DispatchQueue.main.async {
                             try? data.write(to: url)

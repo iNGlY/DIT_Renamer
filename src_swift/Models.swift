@@ -1,11 +1,15 @@
 import Foundation
 
 public struct MountedVolume: Identifiable, Hashable {
-    public var id: String { path }
+    public var id: String { volumeUUID ?? bsdNode }
     public let name: String
     public let originalName: String
     public let path: String
     public let bsdNode: String
+    public let volumeUUID: String?
+    public let mediaUUID: String?
+    public let isRemovable: Bool
+    public let isInternal: Bool
     public let freeBytes: Int64
     public let totalBytes: Int64
     public let isGenericName: Bool
@@ -100,6 +104,8 @@ public struct ScanResult {
     public let earliestDateStr: String?
     public let latestDateStr: String?
     public let hdeResult: HDEResult?
+    public let isScanComplete: Bool
+    public let needsExifToolInstallation: Bool
     
     public init(suggestedName: String?,
                 cameraLetter: String?,
@@ -119,7 +125,9 @@ public struct ScanResult {
                 dateSpanDays: Int = 0,
                 earliestDateStr: String? = nil,
                 latestDateStr: String? = nil,
-                hdeResult: HDEResult? = nil) {
+                hdeResult: HDEResult? = nil,
+                isScanComplete: Bool = true,
+                needsExifToolInstallation: Bool = false) {
         self.suggestedName = suggestedName
         self.cameraLetter = cameraLetter
         self.rollNumber = rollNumber
@@ -139,6 +147,8 @@ public struct ScanResult {
         self.earliestDateStr = earliestDateStr
         self.latestDateStr = latestDateStr
         self.hdeResult = hdeResult
+        self.isScanComplete = isScanComplete
+        self.needsExifToolInstallation = needsExifToolInstallation
     }
 }
 
@@ -156,6 +166,11 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
     public let dateDayString: String
     public var isUnformatted: Bool? = false
     public var isEmptyCard: Bool? = false
+    public var requestedName: String? = nil
+    public var volumeUUID: String? = nil
+    public var mediaUUID: String? = nil
+    public var bsdNode: String? = nil
+    public var mountedPath: String? = nil
     
     public var formattedTime: String {
         let formatter = DateFormatter()
@@ -175,7 +190,12 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
                 timestamp: Date,
                 dateDayString: String,
                 isUnformatted: Bool? = false,
-                isEmptyCard: Bool? = false) {
+                isEmptyCard: Bool? = false,
+                requestedName: String? = nil,
+                volumeUUID: String? = nil,
+                mediaUUID: String? = nil,
+                bsdNode: String? = nil,
+                mountedPath: String? = nil) {
         self.id = id
         self.originalName = originalName
         self.newName = newName
@@ -189,5 +209,10 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
         self.dateDayString = dateDayString
         self.isUnformatted = isUnformatted
         self.isEmptyCard = isEmptyCard
+        self.requestedName = requestedName
+        self.volumeUUID = volumeUUID
+        self.mediaUUID = mediaUUID
+        self.bsdNode = bsdNode
+        self.mountedPath = mountedPath
     }
 }

@@ -4,28 +4,43 @@ import WebKit
 class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
     static let shared = ParaShootPDFGenerator()
     
-    private var webView: WKWebView?
-    private var completion: ((Data?) -> Void)?
+    private var webViews: [ObjectIdentifier: WKWebView] = [:]
+    private var completions: [ObjectIdentifier: (Data?) -> Void] = [:]
     
     func generatePDF(for report: ParaShootDailyReport,
-                     language: AppLanguage = .en,
+                     language: AppLanguage,
+                     includeHighConfidenceAssociation: Bool,
                      completion: @escaping (Data?) -> Void) {
-        generateCombinedPDF(dateStr: report.date, renameItems: [], parashootReport: report, language: language, completion: completion)
+        generateCombinedPDF(
+            dateStr: report.date,
+            renameItems: [],
+            parashootReport: report,
+            language: language,
+            includeHighConfidenceAssociation: includeHighConfidenceAssociation,
+            completion: completion
+        )
     }
     
     func generateCombinedPDF(dateStr: String,
                              renameItems: [RenameHistoryItem],
                              parashootReport: ParaShootDailyReport?,
-                             language: AppLanguage = .en,
+                             language: AppLanguage,
+                             includeHighConfidenceAssociation: Bool,
                              completion: @escaping (Data?) -> Void) {
-        self.completion = completion
-        
-        let html = generateCombinedHTML(dateStr: dateStr, renameItems: renameItems, parashootReport: parashootReport, language: language)
+        let html = generateCombinedHTML(
+            dateStr: dateStr,
+            renameItems: renameItems,
+            parashootReport: parashootReport,
+            language: language,
+            includeHighConfidenceAssociation: includeHighConfidenceAssociation
+        )
         
         let config = WKWebViewConfiguration()
         let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 1131), configuration: config) // A4 ratio approx
         view.navigationDelegate = self
-        self.webView = view
+        let key = ObjectIdentifier(view)
+        webViews[key] = view
+        completions[key] = completion
         
         view.loadHTMLString(html, baseURL: nil)
     }
@@ -35,22 +50,50 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         pdfConfig.rect = CGRect(x: 0, y: 0, width: 800, height: 1131)
         
         webView.createPDF(configuration: pdfConfig) { [weak self] result in
+            guard let self else { return }
+            let key = ObjectIdentifier(webView)
             switch result {
             case .success(let data):
-                self?.completion?(data)
+                self.completions[key]?(data)
             case .failure(let error):
                 print("PDF generation error: \(error)")
-                self?.completion?(nil)
+                self.completions[key]?(nil)
             }
-            self?.completion = nil
-            self?.webView = nil
+            self.completions.removeValue(forKey: key)
+            self.webViews.removeValue(forKey: key)
         }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(webView: webView, data: nil, error: error)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(webView: webView, data: nil, error: error)
+    }
+
+    private func finish(webView: WKWebView, data: Data?, error: Error?) {
+        let key = ObjectIdentifier(webView)
+        if let error { print("PDF generation error: \(error)") }
+        completions[key]?(data)
+        completions.removeValue(forKey: key)
+        webViews.removeValue(forKey: key)
+    }
+
+    private func htmlEscape(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
     }
     
     private func generateCombinedHTML(dateStr: String,
                                       renameItems: [RenameHistoryItem],
                                       parashootReport: ParaShootDailyReport?,
-                                      language: AppLanguage) -> String {
+                                      language: AppLanguage,
+                                      includeHighConfidenceAssociation: Bool) -> String {
         let isCN = (language == .zh)
         
         // MARK: - Localized strings
@@ -71,7 +114,11 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         let lDevInfo    = isCN ? "设备信息" : "Device Info"
         let lTarget     = isCN ? "挂载节点" : "Target"
         let lVerify     = isCN ? "验证状态" : "Verification Status"
-        let lSafe       = isCN ? "安全验证" : "SAFE / VERIFIED"
+        let lPassed     = isCN ? "校验通过" : "VERIFIED"
+        let lAssociation = isCN ? "关联结果" : "Association"
+        let lHighConfidence = isCN ? "高置信度：源路径匹配" : "HIGH CONFIDENCE: source path matched"
+        let lAssociationUnavailable = isCN ? "未建立高置信度关联" : "No high-confidence association"
+        let lBadge      = isCN ? "DIT 审计报告" : "DIT REPORT"
         let lFooter     = isCN ? "由 DIT Renamer 生成 © \(Calendar.current.component(.year, from: Date())) — 统一 DIT 审计报告" :
                                   "Generated by DIT Renamer © \(Calendar.current.component(.year, from: Date())) — Unified DIT Audit Integration"
         let lSec1Title  = isCN ? "1. 卡卷重命名记录" : "1. Media Volume Renaming Log"
@@ -80,19 +127,19 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         // MARK: - Section 1: Rename Log Rows
         var renameRows = ""
         for item in renameItems {
-            let first = item.firstClipName ?? "-"
-            let last = item.lastClipName ?? "-"
+            let first = htmlEscape(item.firstClipName ?? "-")
+            let last = htmlEscape(item.lastClipName ?? "-")
             renameRows += """
             <tr>
-                <td>\(item.formattedTime)</td>
-                <td><code style="background:#eef2ff; color:#3730a3;">\(item.originalName)</code></td>
-                <td><strong style="color:#059669;">\(item.newName)</strong></td>
+                <td>\(htmlEscape(item.formattedTime))</td>
+                <td><code style="background:#eef2ff; color:#3730a3;">\(htmlEscape(item.originalName))</code></td>
+                <td><strong style="color:#059669;">\(htmlEscape(item.newName))</strong></td>
                 <td style="font-family:monospace; font-size:10px;">\(first)</td>
                 <td style="font-family:monospace; font-size:10px;">\(last)</td>
                 <td style="text-align:center;">\(item.clipCount)</td>
                 <td style="text-align:center;">\(item.totalFileCount)</td>
                 <td style="text-align:right;">\(item.usedSpace)</td>
-                <td><span class="badge-blue">\(item.deviceType)</span></td>
+                <td><span class="badge-blue">\(htmlEscape(item.deviceType))</span></td>
             </tr>
             """
         }
@@ -126,15 +173,29 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         var parashootRows = ""
         if let events = parashootReport?.events {
             for event in events {
-                let statusColor = event.isSafe ? "#059669" : "#dc2626"
-                let statusText = event.isSafe ? lSafe : (isCN ? "警告（\(event.missingFilesCount) 个文件缺失）" : "WARNING (\(event.missingFilesCount) Missing)")
+                let statusColor: String
+                let statusText: String
+                if !event.isVerificationKnown {
+                    statusColor = "#a16207"
+                    statusText = isCN ? "未知（未找到校验结果）" : "UNKNOWN (No verification result)"
+                } else if event.isSafe {
+                    statusColor = "#059669"
+                    statusText = lPassed
+                } else {
+                    statusColor = "#dc2626"
+                    statusText = isCN ? "警告（\(event.missingFilesCount) 个文件缺失）" : "WARNING (\(event.missingFilesCount) Missing)"
+                }
+                let associationCell = includeHighConfidenceAssociation
+                    ? "<td>\(htmlEscape(event.isHighConfidenceAssociation ? lHighConfidence : lAssociationUnavailable))</td>"
+                    : ""
                 parashootRows += """
                 <tr>
-                    <td>\(event.formattedDateTime)</td>
-                    <td><strong>\(event.volumeName)</strong></td>
-                    <td>\(event.deviceVendor) \(event.deviceModel)</td>
-                    <td><code>\(event.bsdUnit)</code></td>
-                    <td style="color: \(statusColor); font-weight: bold;">\(statusText)</td>
+                    <td>\(htmlEscape(event.formattedDateTime))</td>
+                    <td><strong>\(htmlEscape(event.volumeName))</strong></td>
+                    <td>\(htmlEscape(event.deviceVendor)) \(htmlEscape(event.deviceModel))</td>
+                    <td><code>\(htmlEscape(event.bsdUnit))</code></td>
+                    <td style="color: \(statusColor); font-weight: bold;">\(htmlEscape(statusText))</td>
+                    \(associationCell)
                 </tr>
                 """
             }
@@ -142,6 +203,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         
         var parashootSection = ""
         if let events = parashootReport?.events, !events.isEmpty {
+            let associationHeader = includeHighConfidenceAssociation ? "<th>\(lAssociation)</th>" : ""
             parashootSection = """
             <div class="section-title" style="margin-top: 30px;">\(lSec2Title)</div>
             <table>
@@ -152,6 +214,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
                         <th>\(lDevInfo)</th>
                         <th>\(lTarget)</th>
                         <th>\(lVerify)</th>
+                        \(associationHeader)
                     </tr>
                 </thead>
                 <tbody>
@@ -171,13 +234,16 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         }
         let subTitle = isCN ? "卡卷重命名与 ParaShoot 擦卡审计综合报告" : "Media Volume Renaming & ParaShoot Erase Audit Report"
         
-        let printedTime = isCN
-            ? DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)
-            : DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)
+        let printFormatter = DateFormatter()
+        printFormatter.locale = Locale(identifier: isCN ? "zh_CN" : "en_US")
+        printFormatter.dateStyle = .medium
+        printFormatter.timeStyle = .medium
+        let printedTime = printFormatter.string(from: Date())
+        let documentLanguage = isCN ? "zh-CN" : "en"
         
         return """
         <!DOCTYPE html>
-        <html>
+        <html lang="\(documentLanguage)">
         <head>
             <meta charset="utf-8">
             <style>
@@ -199,15 +265,15 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         <body>
             <div class="header">
                 <div>
-                    <div class="lab-badge">DIT REPORT</div>
-                    <h1 class="title">\(reportTitle)</h1>
-                    <p class="subtitle">\(subTitle)</p>
+                    <div class="lab-badge">\(htmlEscape(lBadge))</div>
+                    <h1 class="title">\(htmlEscape(reportTitle))</h1>
+                    <p class="subtitle">\(htmlEscape(subTitle))</p>
                 </div>
                 <div class="meta-info">
-                    <strong>\(lDate):</strong> \(dateStr)<br>
+                    <strong>\(lDate):</strong> \(htmlEscape(dateStr))<br>
                     <strong>\(lRenamed):</strong> \(renameItems.count)<br>
                     <strong>\(lWiped):</strong> \(parashootReport?.events.count ?? 0)<br>
-                    <strong>\(lPrinted):</strong> \(printedTime)
+                    <strong>\(htmlEscape(lPrinted)):</strong> \(htmlEscape(printedTime))
                 </div>
             </div>
             
@@ -215,7 +281,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
             \(parashootSection)
             
             <div class="footer">
-                \(lFooter)
+                \(htmlEscape(lFooter))
             </div>
         </body>
         </html>

@@ -10,7 +10,10 @@ public struct ParaShootEraseEvent: Identifiable {
     public let deviceModel: String
     public let bsdUnit: String // e.g. "5" -> "disk5"
     public let missingFilesCount: Int
+    public let isVerificationKnown: Bool
     public let isSafe: Bool
+    public let verificationSourcePath: String?
+    public let isHighConfidenceAssociation: Bool
     
     /// 格式化为 YY/MM/DD  HH:MM:SS，用于 UI 卡片和 PDF 报告
     public var formattedDateTime: String {
@@ -38,6 +41,11 @@ public class ParaShootParser: ObservableObject {
     private var fileDescriptor: Int32 = -1
     private var directoryDescriptor: Int32 = -1
     private var pollTimer: Timer?
+
+    private struct PendingVerification {
+        let missingFilesCount: Int
+        let sourcePath: String?
+    }
     
     public init() {
         reloadLogs()
@@ -129,17 +137,28 @@ public class ParaShootParser: ObservableObject {
     }
     
     public func parseLogs() -> [ParaShootDailyReport] {
-        guard let content = try? String(contentsOf: logPath, encoding: .utf8) else {
+        let contents = orderedLogPaths().compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+        guard !contents.isEmpty else {
             return []
         }
         
-        let lines = content.components(separatedBy: .newlines)
+        let lines = contents.flatMap { $0.components(separatedBy: .newlines) }
         var events: [ParaShootEraseEvent] = []
-        var lastMissingCount = 0
+        var pendingVerificationsBySourcePath: [String: PendingVerification] = [:]
+        var pendingLegacyVerification: PendingVerification?
         
         for line in lines {
-            if line.contains("CheckResult{missing: {") {
-                lastMissingCount = line.components(separatedBy: "FileSignature(").count - 1
+            if let verification = parseCheckResult(from: line) {
+                if let sourcePath = verification.sourcePath, !sourcePath.isEmpty {
+                    pendingVerificationsBySourcePath[sourcePath] = verification
+                } else {
+                    pendingLegacyVerification = verification
+                }
+            } else if line.contains("CheckResult{missing: {") {
+                pendingLegacyVerification = PendingVerification(
+                    missingFilesCount: line.components(separatedBy: "FileSignature(").count - 1,
+                    sourcePath: nil
+                )
             }
             
             if line.contains("Erasing DiskInfo(") {
@@ -157,6 +176,16 @@ public class ParaShootParser: ObservableObject {
                     let vendor = extractValue(from: msgPart, key: "deviceVendor: ")
                     let model = extractValue(from: msgPart, key: "deviceModel: ")
                     let bsd = extractValue(from: msgPart, key: "mediaBSDUnit: ")
+                    let mountedPath = extractValue(from: msgPart, key: "path: ")
+                    let verification: PendingVerification?
+                    if !mountedPath.isEmpty,
+                       let matched = pendingVerificationsBySourcePath.removeValue(forKey: mountedPath) {
+                        verification = matched
+                    } else {
+                        verification = pendingLegacyVerification
+                        pendingLegacyVerification = nil
+                    }
+                    let isHighConfidenceAssociation = verification?.sourcePath == mountedPath && !mountedPath.isEmpty
                     
                     let event = ParaShootEraseEvent(
                         timestamp: timeStr,
@@ -165,12 +194,13 @@ public class ParaShootParser: ObservableObject {
                         deviceVendor: vendor.isEmpty ? "Unknown" : vendor,
                         deviceModel: model.isEmpty ? "Unknown" : model,
                         bsdUnit: bsd.isEmpty ? "-" : "disk\(bsd)",
-                        missingFilesCount: max(0, lastMissingCount),
-                        isSafe: lastMissingCount <= 0
+                        missingFilesCount: max(0, verification?.missingFilesCount ?? 0),
+                        isVerificationKnown: verification != nil,
+                        isSafe: verification?.missingFilesCount == 0,
+                        verificationSourcePath: verification?.sourcePath,
+                        isHighConfidenceAssociation: isHighConfidenceAssociation
                     )
                     events.append(event)
-                    
-                    lastMissingCount = 0
                 }
             }
         }
@@ -178,6 +208,31 @@ public class ParaShootParser: ObservableObject {
         let grouped = Dictionary(grouping: events, by: { $0.date })
         return grouped.map { ParaShootDailyReport(date: $0.key, events: $0.value.sorted(by: { $0.timestamp > $1.timestamp })) }
             .sorted(by: { $0.date > $1.date })
+    }
+
+    private func orderedLogPaths() -> [URL] {
+        let directory = logPath.deletingLastPathComponent()
+        let baseName = logPath.lastPathComponent
+        let paths = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        return paths.filter { path in
+            let name = path.lastPathComponent
+            guard name.hasPrefix(baseName) else { return false }
+            if name == baseName { return true }
+            guard name.hasPrefix("\(baseName).") else { return false }
+            return Int(name.dropFirst(baseName.count + 1)) != nil
+        }
+        .sorted { rotationOrder(for: $0, baseName: baseName) < rotationOrder(for: $1, baseName: baseName) }
+    }
+
+    private func rotationOrder(for path: URL, baseName: String) -> Int {
+        let name = path.lastPathComponent
+        guard name != baseName else { return .max }
+        return Int(name.dropFirst(baseName.count + 1)) ?? .min
     }
     
     private func extractValue(from text: String, key: String) -> String {
@@ -189,5 +244,21 @@ public class ParaShootParser: ObservableObject {
             return String(sub[..<parenRange.lowerBound]).trimmingCharacters(in: .whitespaces)
         }
         return ""
+    }
+
+    private func parseCheckResult(from text: String) -> PendingVerification? {
+        guard text.contains("Check result:") else { return nil }
+        guard let missingFilesCount = extractInteger(from: text, key: "missingFiles: ") else { return nil }
+        let sourcePath = extractValue(from: text, key: "source: ")
+        return PendingVerification(
+            missingFilesCount: missingFilesCount,
+            sourcePath: sourcePath.isEmpty ? nil : sourcePath
+        )
+    }
+
+    private func extractInteger(from text: String, key: String) -> Int? {
+        guard let range = text.range(of: key) else { return nil }
+        let digits = text[range.upperBound...].prefix { $0.isNumber }
+        return Int(digits)
     }
 }

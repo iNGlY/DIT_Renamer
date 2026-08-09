@@ -28,4 +28,5 @@ env/
 .venv
 # Generated Swift builds and packaged release artifacts.
 /build_swift/
+/build_printer/
 /Release/

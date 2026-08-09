@@ -7,6 +7,7 @@ struct SidebarView: View {
     
     @ObservedObject var langManager = LanguageManager.shared
     @State private var sidebarTab: Int = 0
+    @State private var knownVolumeIDs: Set<String> = []
     @AppStorage("ignoredVolumePaths") private var ignoredPathsData: Data = Data()
     
     var ignoredPaths: Set<String> {
@@ -45,7 +46,7 @@ struct SidebarView: View {
                     Text("DIT Renamer")
                         .font(.headline)
                         .fontWeight(.bold)
-                    Text("Release 1.0.1")
+                    Text("Release 1.1")
                         .font(.caption2)
                         .foregroundColor(.blue)
                 }
@@ -165,16 +166,24 @@ struct SidebarView: View {
         .frame(width: 260)
         .background(.ultraThinMaterial)
         .onAppear {
+            knownVolumeIDs = Set(activeVolumes.map(\.id))
             if selectedVolume == nil, let first = activeVolumes.first {
                 selectedVolume = first
             }
         }
-        .onChange(of: monitor.volumes) { newVolumes in
+        .onChange(of: monitor.volumes) { _, newVolumes in
             let active = newVolumes.filter { !ignoredPaths.contains($0.path) }
-            if selectedVolume == nil, let first = active.first {
-                selectedVolume = first
-            } else if let newCard = active.first(where: { v in !monitor.volumes.contains(where: { $0.id == v.id }) || selectedVolume == nil }) {
-                selectedVolume = newCard
+            let newIDs = Set(active.map(\.id))
+            let inserted = active.first { !knownVolumeIDs.contains($0.id) }
+            knownVolumeIDs = newIDs
+
+            if let selectedVolume, !newIDs.contains(selectedVolume.id) {
+                self.selectedVolume = inserted ?? active.first
+            } else if self.selectedVolume == nil {
+                self.selectedVolume = inserted ?? active.first
+            } else if let inserted {
+                // A newly mounted card is the only event that may change selection.
+                self.selectedVolume = inserted
             }
         }
     }
@@ -183,26 +192,13 @@ struct SidebarView: View {
     var onShowSettings: () -> Void = {}
     
     private func volumeRow(vol: MountedVolume, isIgnored: Bool) -> some View {
-        let scanResult = MediaScanner.scan(volumePath: vol.path)
-        let isRenamed = !vol.isGenericName && RenameHistoryStore.shared.isRenamed(volumeName: vol.name, firstClipName: scanResult.firstClipName)
+        let isRenamed = !vol.isGenericName && RenameHistoryStore.shared.isRenamed(volumeName: vol.name)
         
         let iconName: String
         let iconColor: Color
         if isRenamed {
             iconName = "checkmark.seal.fill"
             iconColor = .green
-        } else if scanResult.isUnformattedCard {
-            iconName = "exclamationmark.triangle.fill"
-            iconColor = .red
-        } else if scanResult.isUnconfiguredCamera {
-            iconName = "exclamationmark.shield.fill"
-            iconColor = .orange
-        } else if scanResult.isEmptyCard {
-            iconName = "tray"
-            iconColor = .gray
-        } else if scanResult.isPhotoOnly {
-            iconName = "camera.fill"
-            iconColor = .purple
         } else if vol.isGenericName {
             iconName = "film.fill"
             iconColor = .blue
@@ -234,38 +230,6 @@ struct SidebarView: View {
                         .background(Color.green.opacity(0.2))
                         .foregroundColor(.green)
                         .cornerRadius(4)
-                    } else if scanResult.isUnformattedCard {
-                        Text(langManager.text("未格式化旧卡", "Unformatted"))
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.red.opacity(0.2))
-                            .foregroundColor(.red)
-                            .cornerRadius(4)
-                    } else if scanResult.isUnconfiguredCamera {
-                        Text(langManager.text("未设机位", "Unconfigured"))
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.orange.opacity(0.2))
-                            .foregroundColor(.orange)
-                            .cornerRadius(4)
-                    } else if scanResult.isEmptyCard {
-                        Text(langManager.text("空卡", "Empty"))
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.gray.opacity(0.2))
-                            .foregroundColor(.gray)
-                            .cornerRadius(4)
-                    } else if scanResult.isPhotoOnly {
-                        Text(langManager.text("照片卡", "Photos"))
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.purple.opacity(0.2))
-                            .foregroundColor(.purple)
-                            .cornerRadius(4)
                     } else if vol.isGenericName {
                         Text("RAW")
                             .font(.system(size: 9))

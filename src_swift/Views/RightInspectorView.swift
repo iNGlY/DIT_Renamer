@@ -32,6 +32,23 @@ struct RightInspectorView: View {
     @ObservedObject var parashootParser = ParaShootParser.shared
     @State private var expandedGroupIds: Set<String> = []
     @State private var selectedExportDays: Set<String> = []
+    @State private var exportError: ExportError?
+
+    private enum ExportError: Identifiable {
+        case message(String)
+
+        var id: String {
+            switch self {
+            case .message(let text): return text
+            }
+        }
+
+        var text: String {
+            switch self {
+            case .message(let text): return text
+            }
+        }
+    }
     
     var parashootReports: [ParaShootDailyReport] {
         parashootParser.reports
@@ -98,6 +115,13 @@ struct RightInspectorView: View {
             if let firstPS = parashootReports.first?.date {
                 expandedGroupIds.insert(firstPS)
             }
+        }
+        .alert(item: $exportError) { error in
+            Alert(
+                title: Text(langManager.text("导出失败", "Export failed")),
+                message: Text(error.text),
+                dismissButton: .default(Text(langManager.text("确定", "OK")))
+            )
         }
     }
     
@@ -347,7 +371,7 @@ struct RightInspectorView: View {
     
     // MARK: - Cards & Export Actions
     private func historyCard(item: RenameHistoryItem) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(item.originalName)
                     .font(.caption)
@@ -440,7 +464,20 @@ struct RightInspectorView: View {
     }
     
     private func parashootEventCard(event: ParaShootEraseEvent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let statusText: String
+        let statusColor: Color
+        if !event.isVerificationKnown {
+            statusText = langManager.text("未知", "Unknown")
+            statusColor = .orange
+        } else if event.isSafe {
+            statusText = langManager.text("校验通过", "Verified")
+            statusColor = .green
+        } else {
+            statusText = langManager.text("缺失警示", "Missing Warning")
+            statusColor = .red
+        }
+
+        return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(event.volumeName)
                     .font(.caption)
@@ -456,15 +493,15 @@ struct RightInspectorView: View {
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(event.isSafe ? langManager.text("安全验证", "Verified Safe") : langManager.text("缺失警示", "Missing Warning"))
+                Text(statusText)
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(event.isSafe ? .green : .red)
+                    .foregroundColor(statusColor)
             }
         }
         .padding(8)
         .background(Color.black.opacity(0.15))
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(event.isSafe ? Color.green.opacity(0.2) : Color.red.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(statusColor.opacity(0.3), lineWidth: 1))
     }
     
     private func showRenameExportMenu(groupDay: String, items: [RenameHistoryItem]) {
@@ -513,7 +550,18 @@ struct RightInspectorView: View {
     private func exportCSV(for items: [RenameHistoryItem], dateStr: String) {
         var csvString = "\u{FEFF}Original Name,New Name,First Clip,Last Clip,Clip Count,Total Files,Used Space,Device Type,Time\n"
         for item in items {
-            csvString += "\(item.originalName),\(item.newName),\(item.firstClipName ?? "-"),\(item.lastClipName ?? "-"),\(item.clipCount),\(item.totalFileCount),\(item.usedSpace),\(item.deviceType),\(item.formattedTime)\n"
+            let fields = [
+                item.originalName,
+                item.newName,
+                item.firstClipName ?? "-",
+                item.lastClipName ?? "-",
+                String(item.clipCount),
+                String(item.totalFileCount),
+                item.usedSpace,
+                item.deviceType,
+                item.formattedTime
+            ]
+            csvString += fields.map(csvField).joined(separator: ",") + "\n"
         }
         
         let savePanel = NSSavePanel()
@@ -521,9 +569,18 @@ struct RightInspectorView: View {
         savePanel.nameFieldStringValue = "DIT_Rename_Audit_\(dateStr).csv"
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                try? csvString.write(to: url, atomically: true, encoding: .utf8)
+                do {
+                    try csvString.write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    exportError = .message(error.localizedDescription)
+                }
             }
         }
+    }
+
+    private func csvField(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
     }
     
     private func exportMultipleDays() {
@@ -531,8 +588,10 @@ struct RightInspectorView: View {
         let allItems = sortedDays.flatMap { day in
             groupedRenameItems.first(where: { $0.day == day })?.items ?? []
         }
-        let mergedPS = sortedDays.compactMap { parashootReportDict[$0] }.first
+        let selectedReports = sortedDays.compactMap { parashootReportDict[$0] }
+        let mergedEvents = selectedReports.flatMap(\.events)
         let label = sortedDays.prefix(3).joined(separator: "_") + (sortedDays.count > 3 ? "_etc" : "")
+        let mergedPS = mergedEvents.isEmpty ? nil : ParaShootDailyReport(date: label, events: mergedEvents)
         exportCombinedPDF(dateStr: label, renameItems: allItems, parashootReport: mergedPS)
     }
     
@@ -555,13 +614,25 @@ struct RightInspectorView: View {
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.pdf]
         savePanel.nameFieldStringValue = "ParaShoot_Audit_\(report.date).pdf"
+        let associationOption = NSButton(
+            checkboxWithTitle: lang == .zh ? "导出高置信度关联结果" : "Export high-confidence associations",
+            target: nil,
+            action: nil
+        )
+        associationOption.state = .off
+        savePanel.accessoryView = associationOption
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                ParaShootPDFGenerator.shared.generatePDF(for: report, language: lang) { data in
+                ParaShootPDFGenerator.shared.generatePDF(
+                    for: report,
+                    language: lang,
+                    includeHighConfidenceAssociation: associationOption.state == .on
+                ) { data in
                     if let data = data {
-                        DispatchQueue.main.async {
-                            try? data.write(to: url)
-                        }
+                        do { try data.write(to: url) }
+                        catch { exportError = .message(error.localizedDescription) }
+                    } else {
+                        exportError = .message(langManager.text("PDF 生成失败。", "PDF generation failed."))
                     }
                 }
             }
@@ -573,13 +644,27 @@ struct RightInspectorView: View {
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.pdf]
         savePanel.nameFieldStringValue = "DIT_Unified_Audit_\(dateStr).pdf"
+        let associationOption = NSButton(
+            checkboxWithTitle: lang == .zh ? "导出高置信度关联结果" : "Export high-confidence associations",
+            target: nil,
+            action: nil
+        )
+        associationOption.state = .off
+        savePanel.accessoryView = associationOption
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
-                ParaShootPDFGenerator.shared.generateCombinedPDF(dateStr: dateStr, renameItems: renameItems, parashootReport: parashootReport, language: lang) { data in
+                ParaShootPDFGenerator.shared.generateCombinedPDF(
+                    dateStr: dateStr,
+                    renameItems: renameItems,
+                    parashootReport: parashootReport,
+                    language: lang,
+                    includeHighConfidenceAssociation: associationOption.state == .on
+                ) { data in
                     if let data = data {
-                        DispatchQueue.main.async {
-                            try? data.write(to: url)
-                        }
+                        do { try data.write(to: url) }
+                        catch { exportError = .message(error.localizedDescription) }
+                    } else {
+                        exportError = .message(langManager.text("PDF 生成失败。", "PDF generation failed."))
                     }
                 }
             }

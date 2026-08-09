@@ -11,6 +11,7 @@ struct SettingsView: View {
     // 规则化命名摄影机排除
     @AppStorage("excludeUDF")      private var excludeUDF:     Bool = true  // ARRI Alexa/Amira, Sony Venice
     @AppStorage("excludeHDECodex") private var excludeCodex:   Bool = true  // Codex HDE X2X FUSE
+    @AppStorage("enableExifToolModelDetection") private var enableExifToolModelDetection: Bool = true
     
     // 卷名黑名单
     @AppStorage("customIgnores") private var customIgnoresData: Data = Data()
@@ -70,7 +71,7 @@ struct SettingsView: View {
                 // MARK: - 2. 非摄影机格式排除
                 sectionCard {
                     sectionHeader(icon: "nosign", title: langManager.text("非摄影机格式排除", "Exclude Non-Camera Filesystems"),
-                                  subtitle: langManager.text("排除与摄影机存储无关的文件系统格式。SMBFS / AUTOFS / DEVFS 为强制排除项，不可关闭。", "Exclude filesystems unrelated to camera storage. SMBFS / AUTOFS / DEVFS are always excluded."))
+                                  subtitle: langManager.text("排除与摄影机存储无关的文件系统格式。SMBFS / AUTOFS / DEVFS / Apple Disk Image Media 为强制排除项，不可关闭。", "Exclude filesystems unrelated to camera storage. SMBFS / AUTOFS / DEVFS / Apple Disk Image Media are always excluded."))
                     
                     VStack(spacing: 0) {
                         toggleRow(
@@ -102,12 +103,63 @@ struct SettingsView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
+                        Divider().padding(.horizontal, 12)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Apple Disk Image Media")
+                                    .font(.body)
+                                Text(langManager.text("DMG、稀疏镜像及其他磁盘镜像挂载卷（强制排除）", "Mounted DMG, sparse image, and other disk image volumes (always excluded)"))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "lock.fill")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
                     }
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(8)
                 }
                 
                 // MARK: - 3. 卷名黑名单
+                sectionCard {
+                    sectionHeader(
+                        icon: "camera.metering.unknown",
+                        title: langManager.text("摄像机型号元数据识别", "Camera Model Metadata Detection"),
+                        subtitle: langManager.text("优先读取 Sony 卡内 XML/XMP；仅在其中没有明确型号时，才对一条代表性视频使用 exiftool 回退识别。仅显示元数据明确给出的 Sony 具体机型，不从文件名推断。", "Checks Sony card XML/XMP first. Only when it has no explicit model does exiftool inspect one representative clip. It shows only an explicit Sony model from metadata, never an inference from filenames.")
+                    )
+
+                    toggleRow(
+                        label: langManager.text("启用 exiftool 型号识别", "Enable exiftool model detection"),
+                        detail: langManager.text("关闭后不启动 exiftool；XML/XMP 的只读识别和现有卷名规则不受影响。", "When disabled, exiftool is never launched; read-only XML/XMP recognition and existing volume-name rules are unchanged."),
+                        binding: $enableExifToolModelDetection,
+                        onChange: { monitor.refreshVolumes() }
+                    )
+
+                    HStack(spacing: 6) {
+                        Image(systemName: MediaScanner.exifToolPath == nil ? "exclamationmark.triangle" : "checkmark.circle")
+                            .foregroundColor(MediaScanner.exifToolPath == nil ? .orange : .green)
+                        Text(MediaScanner.exifToolPath == nil
+                             ? langManager.text("未安装 exiftool。只有 XML/XMP 无法识别型号时才需要它；请手动执行 brew install exiftool，或从 exiftool.org 安装。", "exiftool is not installed. It is only needed when XML/XMP cannot identify the model. Install it manually with brew install exiftool or from exiftool.org.")
+                             : langManager.text("exiftool 已安装。", "exiftool is available."))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, MediaScanner.exifToolPath == nil ? 4 : 10)
+
+                    if MediaScanner.exifToolPath == nil {
+                        Link(langManager.text("打开 exiftool 官方安装页", "Open the exiftool installation page"), destination: URL(string: "https://exiftool.org/")!)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 10)
+                    }
+                }
+
+                // MARK: - 4. 卷名黑名单
                 sectionCard {
                     sectionHeader(icon: "list.bullet.rectangle", title: langManager.text("卷名黑名单", "Volume Name Blocklist"),
                                   subtitle: langManager.text("以下卷名将被自动忽略，不显示在侧边栏中。", "Volumes with these names will be automatically ignored in the sidebar."))
@@ -182,7 +234,7 @@ struct SettingsView: View {
             Toggle("", isOn: binding)
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                .onChange(of: binding.wrappedValue) { _ in onChange() }
+                .onChange(of: binding.wrappedValue) { _, _ in onChange() }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -194,6 +246,7 @@ struct SettingsView: View {
         var list = customIgnores
         list.append(trimmed)
         saveCustomIgnores(list)
+        monitor.refreshVolumes()
         newIgnoreInput = ""
     }
     
@@ -201,6 +254,7 @@ struct SettingsView: View {
         var list = customIgnores
         list.remove(at: index)
         saveCustomIgnores(list)
+        monitor.refreshVolumes()
     }
     
     private func saveCustomIgnores(_ list: [String]) {
