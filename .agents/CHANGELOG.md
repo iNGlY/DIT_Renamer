@@ -99,3 +99,10 @@ and handoff context.
 - Changed: `scripts/build_swift_app.sh`, `README.md`
 - Validation: `/bin/bash -n scripts/build_swift_app.sh`; `swiftc -typecheck` for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; native optimized compilation of both slices; `lipo -create`, `lipo -verify_arch`, and `file` confirmed an `arm64` + `x86_64` universal binary; missing-credential execution failed before changing `Release/`; local `spctl --assess --type open --context context:primary-signature` accepted the command syntax and rejected the old ad-hoc DMG as expected; `git diff --check` passed.
 - Follow-up/risk: No valid Developer ID identity or notarytool profile is installed on this Mac, so Developer ID signing, notarization, stapling, and successful Gatekeeper acceptance could not be executed. The existing `Release/` remains the previous arm64-only ad-hoc package and must not be distributed as the new release. The strict pipeline validates credentials first and publishes staged artifacts only after all required checks pass.
+
+### 2026-08-09 — [codex] Correct About copy and document ARRI Reference Tool CMD
+- Commit: `2270cf4`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: `src_swift/Views/AboutView.swift`, `docs/research_codex_device_manager_cli.md`
+- Validation: ARRI Reference Tool official product page, 1.0.0 manual, macOS universal package, `art-cmd --help`, HDE Transcoder page, and ARRI supporting-tools document checked; Swift typecheck and optimized executable compilation passed for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; `/bin/bash -n scripts/build_swift_app.sh`; `git diff --check`.
+- Follow-up/risk: Public ARRI materials do not confirm a CODEX Device Manager CLI or `codex-hde` command. Existing `MediaScanner.swift` and `MainDetailView.swift` still probe/display `codex-hde` and call the fixed 60% estimate an official model; changing that behavior requires user approval. ART CMD 1.0.0 reads/processes/verifies HDE input but does not document HDE output or a size-only estimate command.
