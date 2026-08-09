@@ -18,14 +18,17 @@ case "$RELEASE_MODE" in
     developer-id)
         ARTIFACT_SUFFIX=""
         DMG_VOLUME_NAME="DIT Renamer $VERSION"
+        DMG_INSTRUCTIONS_LABEL=""
         ;;
     adhoc)
         ARTIFACT_SUFFIX="-adhoc-unnotarized"
         DMG_VOLUME_NAME="DIT Renamer $VERSION Ad-hoc"
+        DMG_INSTRUCTIONS_LABEL="Ad-hoc 预发布版"
         ;;
     test)
         ARTIFACT_SUFFIX="-test-adhoc-unnotarized"
         DMG_VOLUME_NAME="DIT Renamer $VERSION Test"
+        DMG_INSTRUCTIONS_LABEL="Test 测试版"
         ;;
     *)
         echo "[ERROR] DIT_RENAMER_RELEASE_MODE must be 'developer-id', 'adhoc', or 'test'." >&2
@@ -243,7 +246,7 @@ DIT Renamer 已使用 Apple Developer ID 签名、完成 notarization 并附加�
 EOF
 else
     cat <<EOF > "$DMG_STAGE/安装说明.txt"
-DIT Renamer $VERSION Test 测试版
+DIT Renamer $VERSION $DMG_INSTRUCTIONS_LABEL
 
 此构建未使用 Apple Developer ID 签名，也没有经过 Apple notarization。
 macOS Gatekeeper 可能阻止从 GitHub 下载的应用直接启动，因此本包不能视为“即开即用”的正式分发版本。

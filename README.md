@@ -18,6 +18,7 @@ DIT Renamer 是一款原生 macOS 工具，帮助 DIT 在拷贝开始前识别�
 - 只读扫描可移除摄影机媒体，并根据目录、素材名和可用元数据给出卷名建议。
 - 允许人工调整机位、卷号、卡片复用次数，并选择是否保留检测到的 suffix。
 - 对 FAT、MS-DOS 和 exFAT 卷名执行 11 字符上限，不会静默截断输入。
+- 在菜单栏快速查看待人工审核的卡片，批准建议卷名，手动指派机位/卷号/复用次数/素材后缀，并可逐张批量批准高置信度卡片。
 - 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
 - 优先从 Sony XML/XMP 读取具体机型；需要时可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
 - 保存原卷名、新卷名、UUID、BSD 节点、首末素材和操作时间。
@@ -67,6 +68,7 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Scans removable camera media without changing card contents, then suggests a volume name from folder, clip-name, and metadata evidence.
 - Lets the operator adjust camera ID, roll number, card reuse count, and whether to keep a detected suffix.
 - Enforces the 11-character FAT, MS-DOS, and exFAT volume-name limit without silently shortening input.
+- Adds a menu-bar review panel for approving suggested names, assigning camera ID/roll/reuse/suffix values, and sequentially approving multiple high-confidence cards.
 - Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
 - Reads Sony XML/XMP metadata first. Optional exiftool detection can inspect one representative clip when needed and can be disabled in Settings.
 - Records original and new names, UUIDs, BSD node, first and last clips, and operation time.
