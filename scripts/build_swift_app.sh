@@ -214,6 +214,7 @@ DMG_STAGE="$BUILD_DIR/dmg_stage"
 mkdir -p "$DMG_STAGE"
 ditto "$APP_BUNDLE" "$DMG_STAGE/DIT Renamer.app"
 ln -s /Applications "$DMG_STAGE/Applications"
+[[ -L "$DMG_STAGE/Applications" ]] || fail "DMG Applications shortcut was not created."
 for legal_file in LICENSE NOTICE; do
     [[ -f "$PROJECT_ROOT/$legal_file" ]] || fail "Missing legal file: $legal_file"
     cp "$PROJECT_ROOT/$legal_file" "$DMG_STAGE/$legal_file"

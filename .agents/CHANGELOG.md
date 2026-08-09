@@ -148,3 +148,10 @@ and handoff context.
 - Changed: Sparkle update integration, universal build/release scripts, 1.1.1 GitHub release requirements and notes, appcast generation, README version links, and dynamic release copy.
 - Validation: Swift typecheck for `arm64-apple-macosx14.0` and `x86_64-apple-macosx14.0`; Bash syntax checks; `git diff --check`; empty appcast input rejection; universal ad-hoc App/ZIP/DMG build; nested code-signature verification; `lipo -verify_arch`; Info.plist update-key inspection; SHA-256 verification; XML validation; and signed appcast generation with one ZIP enclosure.
 - Follow-up/risk: The free ad-hoc build still may require a one-time Gatekeeper approval. GitHub Pages and an actual 1.1.1 GitHub Release asset must exist before the public appcast can advertise this update.
+
+### 2026-08-10 — [codex] Add bilingual public documentation and DMG install shortcut
+- Commit: `pending`
+- Branch: `codex/swift-1.1-hardening`
+- Changed: Bilingual `README.md`, public bilingual `CHANGELOG.md`, first-install instructions, and DMG `/Applications` shortcut validation.
+- Validation: arm64/x86_64 Swift typechecks; Bash syntax checks; `git diff --check`; final DMG shortcut inspection pending after the clean release build.
+- Follow-up/risk: The ad-hoc package remains unnotarized and may require one-time Gatekeeper approval. GitHub Release publication and GitHub Pages appcast deployment are still separate external steps.
