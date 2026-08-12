@@ -16,6 +16,8 @@ public class MediaScanner {
         let shouldInspectCameraMetadata = UserDefaults.standard.object(forKey: "enableExifToolModelDetection") as? Bool ?? true
         let hasSonyStructure = fm.fileExists(atPath: url.appendingPathComponent("PRIVATE/M4ROOT").path)
             || fm.fileExists(atPath: url.appendingPathComponent("M4ROOT").path)
+            || fm.fileExists(atPath: url.appendingPathComponent("PRIVATE/XDROOT").path)
+            || fm.fileExists(atPath: url.appendingPathComponent("XDROOT").path)
         
         guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.nameKey, .isDirectoryKey, .contentModificationDateKey], options: [.skipsHiddenFiles]) else {
             return ScanResult(

@@ -38,32 +38,33 @@ private func renderIcon() -> NSBitmapImageRep {
     NSColor.clear.setFill()
     NSRect(origin: .zero, size: canvasSize).fill()
 
-    // 深色圆角底板：保留专业工具感，同时减少原图网格造成的小尺寸噪声。
-    let backgroundRect = NSRect(x: 64, y: 64, width: 896, height: 896)
-    let background = roundedRect(backgroundRect, radius: 210)
+    // macOS 图标外轮廓使用统一圆角矩形网格；主体保留足够安全边距，
+    // 避免 Dock、Finder 与设置页缩放时触碰视觉边缘。
+    let backgroundRect = NSRect(x: 80, y: 80, width: 864, height: 864)
+    let background = roundedRect(backgroundRect, radius: 190)
     let backgroundGradient = NSGradient(colors: [
         NSColor(calibratedRed: 0.105, green: 0.135, blue: 0.205, alpha: 1),
         NSColor(calibratedRed: 0.035, green: 0.050, blue: 0.085, alpha: 1)
     ])!
     backgroundGradient.draw(in: background, angle: -52)
-    NSColor(calibratedWhite: 1, alpha: 0.22).setStroke()
-    background.lineWidth = 6
+    NSColor(calibratedWhite: 1, alpha: 0.16).setStroke()
+    background.lineWidth = 4
     background.stroke()
 
     // 低对比度蓝色光晕用于集中视觉焦点，不引入额外图形语义。
-    let glow = NSBezierPath(ovalIn: NSRect(x: 205, y: 175, width: 614, height: 670))
-    NSColor(calibratedRed: 0.03, green: 0.47, blue: 1, alpha: 0.10).setFill()
+    let glow = NSBezierPath(ovalIn: NSRect(x: 220, y: 190, width: 584, height: 640))
+    NSColor(calibratedRed: 0.03, green: 0.47, blue: 1, alpha: 0.08).setFill()
     glow.fill()
 
     // 摄影机存储卡主体。
     let shadow = NSShadow()
-    shadow.shadowColor = NSColor.black.withAlphaComponent(0.48)
-    shadow.shadowOffset = NSSize(width: 0, height: -24)
-    shadow.shadowBlurRadius = 32
+    shadow.shadowColor = NSColor.black.withAlphaComponent(0.38)
+    shadow.shadowOffset = NSSize(width: 0, height: -18)
+    shadow.shadowBlurRadius = 28
     shadow.set()
 
-    let cardRect = NSRect(x: 272, y: 176, width: 480, height: 648)
-    let card = roundedRect(cardRect, radius: 42)
+    let cardRect = NSRect(x: 284, y: 188, width: 456, height: 624)
+    let card = roundedRect(cardRect, radius: 40)
     let cardGradient = NSGradient(colors: [
         NSColor(calibratedRed: 0.245, green: 0.270, blue: 0.325, alpha: 1),
         NSColor(calibratedRed: 0.115, green: 0.130, blue: 0.165, alpha: 1)
@@ -74,17 +75,17 @@ private func renderIcon() -> NSBitmapImageRep {
     NSGraphicsContext.current?.saveGraphicsState()
     NSShadow().set()
     let notch = NSBezierPath()
-    notch.move(to: NSPoint(x: 272, y: 704))
-    notch.line(to: NSPoint(x: 392, y: 824))
-    notch.line(to: NSPoint(x: 272, y: 824))
+    notch.move(to: NSPoint(x: 284, y: 698))
+    notch.line(to: NSPoint(x: 398, y: 812))
+    notch.line(to: NSPoint(x: 284, y: 812))
     notch.close()
     NSColor(calibratedRed: 0.078, green: 0.100, blue: 0.155, alpha: 1).setFill()
     notch.fill()
     NSGraphicsContext.current?.restoreGraphicsState()
 
     // 白色卷标只保留产品识别文字 A247。
-    let labelRect = NSRect(x: 330, y: 438, width: 364, height: 248)
-    let label = roundedRect(labelRect, radius: 28)
+    let labelRect = NSRect(x: 338, y: 438, width: 348, height: 224)
+    let label = roundedRect(labelRect, radius: 26)
     let labelGradient = NSGradient(colors: [
         NSColor(calibratedWhite: 1.0, alpha: 1),
         NSColor(calibratedWhite: 0.90, alpha: 1)
@@ -95,7 +96,7 @@ private func renderIcon() -> NSBitmapImageRep {
         "A247",
         in: labelRect.offsetBy(dx: 0, dy: 5),
         attributes: [
-            .font: NSFont.monospacedSystemFont(ofSize: 108, weight: .bold),
+            .font: NSFont.monospacedSystemFont(ofSize: 102, weight: .bold),
             .foregroundColor: NSColor(calibratedRed: 0.02, green: 0.49, blue: 1.0, alpha: 1),
             .kern: -7
         ]
@@ -105,7 +106,7 @@ private func renderIcon() -> NSBitmapImageRep {
     NSGraphicsContext.current?.saveGraphicsState()
     NSShadow().set()
     for index in 0..<6 {
-        let contactRect = NSRect(x: 344 + CGFloat(index) * 61, y: 236, width: 38, height: 118)
+        let contactRect = NSRect(x: 346 + CGFloat(index) * 59, y: 244, width: 36, height: 108)
         let contact = roundedRect(contactRect, radius: 11)
         let contactGradient = NSGradient(colors: [
             NSColor(calibratedRed: 1.0, green: 0.80, blue: 0.28, alpha: 1),

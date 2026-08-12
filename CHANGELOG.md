@@ -1,5 +1,25 @@
 # DIT Renamer 更新日志 / Changelog
 
+## 1.2.0 Test — 2026-08-12
+
+### 中文
+
+- 按 Apple HIG 整理 App 与菜单栏图标，保留 `A247` App 图标，并统一采用经过 macOS 14 可用性验证的 SF Symbols。
+- 增加菜单栏待审核数量、快速批准、手动指派、自动重命名开关和高置信度批量批准。
+- 在侧边栏和“关于”窗口增加检查更新按钮；启动时静默探测新版，发现新版后显示目标版本，点击后展示更新内容并确认安装。
+- 增加 Sony `M4ROOT`、`XDROOT`、MP4 和 MXF 回归覆盖，改善部分 CFexpress Type A 读卡器的外置介质识别。
+- 修复重复 Volume UUID 的双卡运行时身份和审核队列冲突，仍在执行前复核 BSD 节点、Volume UUID 与可用的 Media UUID。
+- 继续对 FAT、MS-DOS 和 exFAT 执行 11 字符卷名上限，并在成功重命名后强制卸载和重挂载同一分区。
+
+### English
+
+- Aligned App and menu-bar icons with Apple HIG, retained the `A247` App icon, and standardized interface symbols on SF Symbols verified for macOS 14.
+- Added menu-bar review counts, quick approval, manual assignment, an auto-rename switch, and sequential batch approval for high-confidence cards.
+- Added check-for-updates buttons to the sidebar and About window. Launch checks probe quietly; when a newer release is found, the target version is shown and release notes appear before installation confirmation.
+- Added Sony `M4ROOT`, `XDROOT`, MP4, and MXF regression coverage and improved external-media recognition for some CFexpress Type A readers.
+- Fixed runtime and approval-queue collisions for two cards that share a Volume UUID, while preserving BSD node, Volume UUID, and available Media UUID verification before execution.
+- Continued enforcing the 11-character FAT, MS-DOS, and exFAT volume-name limit and force-remounting the same partition after a successful rename.
+
 ## 1.1.1 — 2026-08-10
 
 ### 中文

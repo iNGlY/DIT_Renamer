@@ -1,7 +1,9 @@
 import Foundation
 
 public struct MountedVolume: Identifiable, Hashable {
-    public var id: String { volumeUUID ?? bsdNode }
+    // BSD node keeps simultaneously mounted cards distinct even when cloned
+    // FAT/exFAT media exposes the same volume UUID.
+    public var id: String { "\(volumeUUID ?? "NO-UUID")|\(bsdNode)" }
     public let name: String
     public let originalName: String
     public let path: String

@@ -86,6 +86,10 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     public var identityKey: String {
         "\(volumeUUID)|\(firstClipName ?? "")|\(lastClipName ?? "")"
     }
+
+    public func hasSameMediaIdentity(as other: RenameCandidate) -> Bool {
+        identityKey == other.identityKey
+    }
 }
 
 public struct RenameExecutionResult: Identifiable, Hashable {

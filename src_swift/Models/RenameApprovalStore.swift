@@ -25,9 +25,11 @@ public final class RenameApprovalStore: ObservableObject {
     }
 
     public func upsert(_ candidate: RenameCandidate) {
-        if let index = candidates.firstIndex(where: { $0.volumeUUID == candidate.volumeUUID }) {
+        if let index = candidates.firstIndex(where: { $0.hasSameMediaIdentity(as: candidate) }) {
             let existing = candidates[index]
-            guard existing.identityKey != candidate.identityKey || existing.effectiveName != candidate.effectiveName else { return }
+            guard existing.effectiveName != candidate.effectiveName
+                    || existing.bsdNode != candidate.bsdNode
+                    || existing.mountPath != candidate.mountPath else { return }
             candidates[index] = candidate
         } else {
             candidates.append(candidate)

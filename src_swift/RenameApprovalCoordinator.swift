@@ -43,7 +43,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard candidate.effectiveName != nil || !volume.isUniqueCameraName else { return nil }
         store.upsert(candidate)
         syncFromStore()
-        return pendingCandidates.first(where: { $0.volumeUUID == candidate.volumeUUID })
+        return pendingCandidates.first(where: { $0.hasSameMediaIdentity(as: candidate) })
     }
 
     func approveSuggestedName(candidateID: UUID) async -> RenameExecutionResult {

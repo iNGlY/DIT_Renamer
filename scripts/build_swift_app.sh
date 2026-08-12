@@ -286,6 +286,10 @@ tar -xf "$SOURCE_ARCHIVE" -C "$SOURCE_DIR"
 RELEASE_NOTES_PATH="$PROJECT_ROOT/docs/github_release_notes_$VERSION.md"
 if [[ -f "$RELEASE_NOTES_PATH" ]]; then
     cp "$RELEASE_NOTES_PATH" "$STAGED_RELEASE_DIR/GITHUB_RELEASE_NOTES.md"
+    # Sparkle's appcast generator pairs a sidecar note with the ZIP using
+    # the archive basename. This lets the standard update dialog show the
+    # release contents before the user confirms installation.
+    cp "$RELEASE_NOTES_PATH" "${ZIP_PATH%.zip}.md"
 fi
 RELEASE_REQUIREMENTS_PATH="$PROJECT_ROOT/docs/github_release_$VERSION.md"
 if [[ -f "$RELEASE_REQUIREMENTS_PATH" ]]; then

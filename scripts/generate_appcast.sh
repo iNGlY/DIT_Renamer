@@ -48,6 +48,7 @@ fi
 GENERATE_ARGS+=(
     --download-url-prefix "$DOWNLOAD_PREFIX"
     --link "https://github.com/iNGlY/DIT_Renamer/releases/latest"
+    --embed-release-notes
     --maximum-deltas 0
     -o "$APPCAST_PATH"
     "$SOURCE_DIR"

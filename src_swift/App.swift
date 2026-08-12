@@ -110,9 +110,9 @@ struct DITRenamerApp: App {
             }
             CommandGroup(after: .appInfo) {
                 Button(langManager.text("检查更新…", "Check for Updates…")) {
-                    updateController.checkForUpdates()
+                    updateController.performUserUpdateAction()
                 }
-                .disabled(!updateController.canCheckForUpdates)
+                .disabled(!updateController.canCheckForUpdates || MediaOperationCoordinator.shared.isBusy)
             }
         }
 

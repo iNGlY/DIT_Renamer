@@ -123,6 +123,11 @@ struct SidebarView: View {
             .listStyle(.sidebar)
             
             Divider()
+
+            UpdateActionButton()
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.horizontal, 10)
             
             // Bottom Footer (Language Switcher, Settings & About)
             HStack {
@@ -200,7 +205,7 @@ struct SidebarView: View {
             iconName = "checkmark.seal.fill"
             iconColor = .green
         } else if vol.isGenericName {
-            iconName = "film.fill"
+            iconName = "sdcard"
             iconColor = .blue
         } else {
             iconName = "sdcard.fill"

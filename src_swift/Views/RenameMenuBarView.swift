@@ -54,7 +54,7 @@ struct RenameMenuBarView: View {
                             "批量批准 \(coordinator.batchCandidates.count) 张高置信度卡",
                             "Approve \(coordinator.batchCandidates.count) high-confidence cards"
                         ),
-                        systemImage: "checkmark.circle.badge.checkmark"
+                        systemImage: "checkmark.circle.fill"
                     )
                 }
                 .buttonStyle(.borderedProminent)

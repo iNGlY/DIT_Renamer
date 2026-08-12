@@ -210,6 +210,9 @@ struct AboutView: View {
 
             Spacer()
 
+            UpdateActionButton()
+                .buttonStyle(.bordered)
+
             Button(langManager.text("关闭", "Close")) {
                 dismiss()
             }

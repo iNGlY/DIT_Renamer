@@ -50,13 +50,19 @@ public class VolumeMonitor: ObservableObject {
                 if path == "/" || path.hasPrefix("/System") || path.hasPrefix("/private") { continue }
 
                 let resourceValues = try? url.resourceValues(forKeys: resourceKeys)
-                // The app is for camera cards. Unknown media identity is a hard stop,
-                // because scanning a backup volume is more dangerous than hiding it.
-                guard resourceValues?.volumeIsRemovable == true,
-                      resourceValues?.volumeIsInternal != true else { continue }
-
                 guard let identity = Self.diskIdentity(for: path),
                       !identity.isAppleDiskImage else { continue }
+
+                // Some CFexpress readers do not propagate Foundation's removable flag.
+                // Prefer diskutil's media identity, but never admit an internal or
+                // identity-unknown volume into the camera-card workflow.
+                guard Self.isEligibleExternalMedia(
+                    diskInternal: identity.isInternal,
+                    diskRemovable: identity.isRemovableMedia,
+                    diskExternal: identity.isExternalDevice,
+                    foundationRemovable: resourceValues?.volumeIsRemovable,
+                    foundationInternal: resourceValues?.volumeIsInternal
+                ) else { continue }
                 
                 var fsType = "UNKNOWN"
                 var stat = statfs()
@@ -125,6 +131,9 @@ public class VolumeMonitor: ObservableObject {
         let mediaUUID: String?
         let mediaName: String?
         let busProtocol: String?
+        let isInternal: Bool?
+        let isRemovableMedia: Bool?
+        let isExternalDevice: Bool?
 
         var isAppleDiskImage: Bool {
             mediaName?.caseInsensitiveCompare("Apple Disk Image Media") == .orderedSame
@@ -134,6 +143,17 @@ public class VolumeMonitor: ObservableObject {
 
     private static func normalizeName(_ name: String) -> String {
         name.precomposedStringWithCanonicalMapping.uppercased()
+    }
+
+    static func isEligibleExternalMedia(
+        diskInternal: Bool?,
+        diskRemovable: Bool?,
+        diskExternal: Bool?,
+        foundationRemovable: Bool?,
+        foundationInternal: Bool?
+    ) -> Bool {
+        guard diskInternal != true, foundationInternal != true else { return false }
+        return diskRemovable == true || diskExternal == true || foundationRemovable == true
     }
 
     private static func diskIdentity(for path: String) -> DiskIdentity? {
@@ -160,7 +180,10 @@ public class VolumeMonitor: ObservableObject {
             volumeUUID: plist["VolumeUUID"] as? String,
             mediaUUID: plist["MediaUUID"] as? String,
             mediaName: plist["MediaName"] as? String,
-            busProtocol: plist["BusProtocol"] as? String
+            busProtocol: plist["BusProtocol"] as? String,
+            isInternal: plist["Internal"] as? Bool,
+            isRemovableMedia: (plist["RemovableMedia"] as? Bool) ?? (plist["Removable"] as? Bool),
+            isExternalDevice: plist["RemovableMediaOrExternalDevice"] as? Bool
         )
     }
 }

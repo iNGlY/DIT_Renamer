@@ -46,6 +46,19 @@ enum DITRenamerAppInfo {
     }
 }
 
+enum DITVersionComparator {
+    static func compare(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let left = lhs.split(separator: ".").map { Int($0) ?? 0 }
+        let right = rhs.split(separator: ".").map { Int($0) ?? 0 }
+        for index in 0..<max(left.count, right.count) {
+            let l = index < left.count ? left[index] : 0
+            let r = index < right.count ? right[index] : 0
+            if l != r { return l < r ? .orderedAscending : .orderedDescending }
+        }
+        return .orderedSame
+    }
+}
+
 private struct PendingUpdate: Codable {
     let targetBuild: String
     let targetDisplayVersion: String
@@ -58,6 +71,7 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     @Published private(set) var canCheckForUpdates = false
     @Published private(set) var isChecking = false
+    @Published private(set) var availableVersion: String?
     @Published var startupNotice: UpdateNotice?
 
     private(set) lazy var updaterController: SPUStandardUpdaterController = {
@@ -70,6 +84,7 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     private var didScheduleLaunchCheck = false
     private var canCheckObservation: AnyCancellable?
+    private var busyObservation: AnyCancellable?
     private let defaults = UserDefaults.standard
     private let lastCheckKey = "DITRenamer.UpdateController.lastLaunchCheck"
     private let pendingUpdateKey = "DITRenamer.UpdateController.pendingUpdate"
@@ -81,14 +96,25 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
         canCheckObservation = updaterController.updater.publisher(for: \.canCheckForUpdates)
             .receive(on: RunLoop.main)
             .sink { [weak self] canCheck in
-                self?.canCheckForUpdates = canCheck
+                guard let self else { return }
+                self.canCheckForUpdates = canCheck
+                if canCheck, self.didScheduleLaunchCheck {
+                    self.performDeferredLaunchCheckIfNeeded()
+                }
+            }
+        busyObservation = MediaOperationCoordinator.shared.$isBusy
+            .removeDuplicates()
+            .sink { [weak self] isBusy in
+                guard let self, !isBusy else { return }
+                self.performDeferredLaunchCheckIfNeeded()
             }
         validatePendingUpdate()
         scheduleLaunchCheck()
     }
 
-    func checkForUpdates() {
+    func performUserUpdateAction() {
         guard updaterController.updater.canCheckForUpdates else { return }
+        isChecking = true
         updaterController.updater.checkForUpdates()
     }
 
@@ -100,18 +126,28 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
         guard lastCheck == nil || Date().timeIntervalSince(lastCheck!) >= launchCheckInterval else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self, !MediaOperationCoordinator.shared.isBusy else { return }
-            self.defaults.set(Date(), forKey: self.lastCheckKey)
-            self.isChecking = true
-            self.updaterController.updater.checkForUpdatesInBackground()
+            self?.performDeferredLaunchCheckIfNeeded()
         }
+    }
+
+    private func performDeferredLaunchCheckIfNeeded() {
+        guard !MediaOperationCoordinator.shared.isBusy,
+              updaterController.updater.canCheckForUpdates else { return }
+        let lastCheck = defaults.object(forKey: lastCheckKey) as? Date
+        guard lastCheck == nil || Date().timeIntervalSince(lastCheck!) >= launchCheckInterval else { return }
+
+        defaults.set(Date(), forKey: lastCheckKey)
+        isChecking = true
+        // 启动时只探测版本，不主动打断现场操作。发现更新后由应用内按钮提示，
+        // 用户点击后再交给 Sparkle 展示发布说明并确认安装。
+        updaterController.updater.checkForUpdateInformation()
     }
 
     private func validatePendingUpdate() {
         guard let data = defaults.data(forKey: pendingUpdateKey),
               let pending = try? JSONDecoder().decode(PendingUpdate.self, from: data) else { return }
 
-        let comparison = compareVersions(DITRenamerAppInfo.buildVersion, pending.targetBuild)
+        let comparison = DITVersionComparator.compare(DITRenamerAppInfo.buildVersion, pending.targetBuild)
         if comparison == .orderedSame || comparison == .orderedDescending {
             defaults.removeObject(forKey: pendingUpdateKey)
             return
@@ -138,17 +174,6 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
         defaults.set(data, forKey: pendingUpdateKey)
     }
 
-    private func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        let left = lhs.split(separator: ".").map { Int($0) ?? 0 }
-        let right = rhs.split(separator: ".").map { Int($0) ?? 0 }
-        for index in 0..<max(left.count, right.count) {
-            let l = index < left.count ? left[index] : 0
-            let r = index < right.count ? right[index] : 0
-            if l != r { return l < r ? .orderedAscending : .orderedDescending }
-        }
-        return .orderedSame
-    }
-
     func updater(_ updater: SPUUpdater, shouldProceedWithUpdate updateItem: SUAppcastItem, updateCheck: SPUUpdateCheck) throws {
         guard !MediaOperationCoordinator.shared.isBusy else {
             throw NSError(
@@ -163,18 +188,22 @@ final class UpdateController: NSObject, ObservableObject, SPUUpdaterDelegate {
     }
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        availableVersion = item.displayVersionString
         isChecking = false
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
+        availableVersion = nil
         isChecking = false
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        availableVersion = nil
         isChecking = false
     }
 
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
+        availableVersion = nil
         writePendingUpdate(for: item)
     }
 
@@ -216,7 +245,7 @@ final class LegacyAppMigrator {
                 continue
             }
             guard let candidateBuild = candidateBundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
-                  compareVersions(candidateBuild, DITRenamerAppInfo.buildVersion) == .orderedAscending else { continue }
+                  DITVersionComparator.compare(candidateBuild, DITRenamerAppInfo.buildVersion) == .orderedAscending else { continue }
             if NSWorkspace.shared.runningApplications.contains(where: { $0.bundleURL?.standardizedFileURL == candidate }) {
                 hadAmbiguousCandidate = true
                 continue
@@ -241,14 +270,4 @@ final class LegacyAppMigrator {
         return path == "/Applications" || path == userApplications
     }
 
-    private func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        let left = lhs.split(separator: ".").map { Int($0) ?? 0 }
-        let right = rhs.split(separator: ".").map { Int($0) ?? 0 }
-        for index in 0..<max(left.count, right.count) {
-            let l = index < left.count ? left[index] : 0
-            let r = index < right.count ? right[index] : 0
-            if l != r { return l < r ? .orderedAscending : .orderedDescending }
-        }
-        return .orderedSame
-    }
 }
