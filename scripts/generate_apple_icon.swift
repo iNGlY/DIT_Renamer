@@ -1,179 +1,142 @@
 import AppKit
 
-func renderIcon(isDark: Bool) -> NSImage {
-    let size = NSSize(width: 512, height: 512)
-    let image = NSImage(size: size)
-    
-    image.lockFocus()
-    guard let ctx = NSGraphicsContext.current?.cgContext else { return image }
-    
-    // Background
-    let squirclePath = NSBezierPath(roundedRect: NSRect(x: 32, y: 32, width: 448, height: 448), xRadius: 100, yRadius: 100)
-    
-    if isDark {
-        let bgGradient = NSGradient(starting: NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.16, alpha: 1.0),
-                                    ending: NSColor(calibratedRed: 0.05, green: 0.06, blue: 0.08, alpha: 1.0))
-        bgGradient?.draw(in: squirclePath, angle: -45)
-        NSColor(white: 1.0, alpha: 0.15).setStroke()
-    } else {
-        let bgGradient = NSGradient(starting: NSColor(calibratedRed: 0.95, green: 0.96, blue: 0.98, alpha: 1.0),
-                                    ending: NSColor(calibratedRed: 0.86, green: 0.89, blue: 0.94, alpha: 1.0))
-        bgGradient?.draw(in: squirclePath, angle: -45)
-        NSColor(white: 1.0, alpha: 0.8).setStroke()
+private let canvasSize = NSSize(width: 1024, height: 1024)
+
+private func roundedRect(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
+    NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+}
+
+private func drawCentered(_ text: String, in rect: NSRect, attributes: [NSAttributedString.Key: Any]) {
+    let value = NSAttributedString(string: text, attributes: attributes)
+    let size = value.size()
+    value.draw(at: NSPoint(
+        x: rect.midX - size.width / 2,
+        y: rect.midY - size.height / 2
+    ))
+}
+
+private func renderIcon() -> NSBitmapImageRep {
+    guard let bitmap = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: Int(canvasSize.width),
+        pixelsHigh: Int(canvasSize.height),
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ), let graphics = NSGraphicsContext(bitmapImageRep: bitmap) else {
+        fatalError("无法创建图标画布。")
     }
-    squirclePath.lineWidth = 3
-    squirclePath.stroke()
-    
-    // Background grid
-    ctx.saveGState()
-    squirclePath.addClip()
-    
-    let gridColor = isDark ? NSColor(calibratedRed: 0.04, green: 0.52, blue: 1.0, alpha: 0.18) : NSColor(calibratedRed: 0.0, green: 0.4, blue: 0.8, alpha: 0.08)
-    gridColor.setStroke()
-    
-    let gridPath = NSBezierPath()
-    gridPath.lineWidth = 1.0
-    let step: CGFloat = 28
-    
-    for x in stride(from: 32, to: 480, by: step) {
-        gridPath.move(to: NSPoint(x: x, y: 32))
-        gridPath.line(to: NSPoint(x: x, y: 480))
-    }
-    for y in stride(from: 32, to: 480, by: step) {
-        gridPath.move(to: NSPoint(x: 32, y: y))
-        gridPath.line(to: NSPoint(x: 480, y: y))
-    }
-    gridPath.stroke()
-    ctx.restoreGState()
-    
-    // Memory card
-    ctx.saveGState()
-    ctx.translateBy(x: 256, y: 235)
-    
+
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphics
+    graphics.imageInterpolation = .high
+
+    NSColor.clear.setFill()
+    NSRect(origin: .zero, size: canvasSize).fill()
+
+    // 深色圆角底板：保留专业工具感，同时减少原图网格造成的小尺寸噪声。
+    let backgroundRect = NSRect(x: 64, y: 64, width: 896, height: 896)
+    let background = roundedRect(backgroundRect, radius: 210)
+    let backgroundGradient = NSGradient(colors: [
+        NSColor(calibratedRed: 0.105, green: 0.135, blue: 0.205, alpha: 1),
+        NSColor(calibratedRed: 0.035, green: 0.050, blue: 0.085, alpha: 1)
+    ])!
+    backgroundGradient.draw(in: background, angle: -52)
+    NSColor(calibratedWhite: 1, alpha: 0.22).setStroke()
+    background.lineWidth = 6
+    background.stroke()
+
+    // 低对比度蓝色光晕用于集中视觉焦点，不引入额外图形语义。
+    let glow = NSBezierPath(ovalIn: NSRect(x: 205, y: 175, width: 614, height: 670))
+    NSColor(calibratedRed: 0.03, green: 0.47, blue: 1, alpha: 0.10).setFill()
+    glow.fill()
+
+    // 摄影机存储卡主体。
     let shadow = NSShadow()
-    shadow.shadowColor = NSColor.black.withAlphaComponent(isDark ? 0.5 : 0.25)
-    shadow.shadowOffset = NSSize(width: 0, height: -14)
-    shadow.shadowBlurRadius = 18
+    shadow.shadowColor = NSColor.black.withAlphaComponent(0.48)
+    shadow.shadowOffset = NSSize(width: 0, height: -24)
+    shadow.shadowBlurRadius = 32
     shadow.set()
-    
-    // Card body
-    let cardRect = NSRect(x: -105, y: -135, width: 210, height: 270)
-    let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: 16, yRadius: 16)
-    
-    if isDark {
-        NSColor(calibratedRed: 0.16, green: 0.18, blue: 0.22, alpha: 1.0).setFill()
-    } else {
-        NSColor(calibratedRed: 0.20, green: 0.22, blue: 0.26, alpha: 1.0).setFill()
+
+    let cardRect = NSRect(x: 272, y: 176, width: 480, height: 648)
+    let card = roundedRect(cardRect, radius: 42)
+    let cardGradient = NSGradient(colors: [
+        NSColor(calibratedRed: 0.245, green: 0.270, blue: 0.325, alpha: 1),
+        NSColor(calibratedRed: 0.115, green: 0.130, blue: 0.165, alpha: 1)
+    ])!
+    cardGradient.draw(in: card, angle: -90)
+
+    // 卡片左上缺角是存储介质的核心轮廓特征。
+    NSGraphicsContext.current?.saveGraphicsState()
+    NSShadow().set()
+    let notch = NSBezierPath()
+    notch.move(to: NSPoint(x: 272, y: 704))
+    notch.line(to: NSPoint(x: 392, y: 824))
+    notch.line(to: NSPoint(x: 272, y: 824))
+    notch.close()
+    NSColor(calibratedRed: 0.078, green: 0.100, blue: 0.155, alpha: 1).setFill()
+    notch.fill()
+    NSGraphicsContext.current?.restoreGraphicsState()
+
+    // 白色卷标只保留产品识别文字 A247。
+    let labelRect = NSRect(x: 330, y: 438, width: 364, height: 248)
+    let label = roundedRect(labelRect, radius: 28)
+    let labelGradient = NSGradient(colors: [
+        NSColor(calibratedWhite: 1.0, alpha: 1),
+        NSColor(calibratedWhite: 0.90, alpha: 1)
+    ])!
+    labelGradient.draw(in: label, angle: -90)
+
+    drawCentered(
+        "A247",
+        in: labelRect.offsetBy(dx: 0, dy: 5),
+        attributes: [
+            .font: NSFont.monospacedSystemFont(ofSize: 108, weight: .bold),
+            .foregroundColor: NSColor(calibratedRed: 0.02, green: 0.49, blue: 1.0, alpha: 1),
+            .kern: -7
+        ]
+    )
+
+    // 少量、加粗的金色触点，在 16–32 px 下仍能辨认出存储卡。
+    NSGraphicsContext.current?.saveGraphicsState()
+    NSShadow().set()
+    for index in 0..<6 {
+        let contactRect = NSRect(x: 344 + CGFloat(index) * 61, y: 236, width: 38, height: 118)
+        let contact = roundedRect(contactRect, radius: 11)
+        let contactGradient = NSGradient(colors: [
+            NSColor(calibratedRed: 1.0, green: 0.80, blue: 0.28, alpha: 1),
+            NSColor(calibratedRed: 0.82, green: 0.56, blue: 0.10, alpha: 1)
+        ])!
+        contactGradient.draw(in: contact, angle: -90)
     }
-    cardPath.fill()
-    
-    // Top Notch
-    let notchPath = NSBezierPath()
-    notchPath.move(to: NSPoint(x: -105, y: 105))
-    notchPath.line(to: NSPoint(x: -75, y: 135))
-    notchPath.line(to: NSPoint(x: -105, y: 135))
-    notchPath.close()
-    (isDark ? NSColor(calibratedRed: 0.10, green: 0.12, blue: 0.16, alpha: 1.0) : NSColor(calibratedRed: 0.95, green: 0.96, blue: 0.98, alpha: 1.0)).setFill()
-    notchPath.fill()
-    
-    // Label Box
-    let labelRect = NSRect(x: -80, y: -35, width: 160, height: 125)
-    let labelPath = NSBezierPath(roundedRect: labelRect, xRadius: 10, yRadius: 10)
-    NSColor.white.setFill()
-    labelPath.fill()
-    
-    // Label text
-    let textStr = "A001"
-    let font = NSFont.monospacedSystemFont(ofSize: 40, weight: .bold)
-    let attrs: [NSAttributedString.Key: Any] = [
-        .font: font,
-        .foregroundColor: NSColor(calibratedRed: 0.04, green: 0.52, blue: 1.0, alpha: 1.0)
-    ]
-    let attrStr = NSAttributedString(string: textStr, attributes: attrs)
-    let textSize = attrStr.size()
-    attrStr.draw(at: NSPoint(x: -textSize.width / 2, y: 25))
-    
-    // Subtext "DJI 4D · ROLL"
-    let subStr = "DJI 4D · ROLL"
-    let subFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
-    let subAttrs: [NSAttributedString.Key: Any] = [
-        .font: subFont,
-        .foregroundColor: NSColor.secondaryLabelColor
-    ]
-    let subAttrStr = NSAttributedString(string: subStr, attributes: subAttrs)
-    let subTextSize = subAttrStr.size()
-    subAttrStr.draw(at: NSPoint(x: -subTextSize.width / 2, y: -8))
-    
-    // Gold Pins
-    for i in 0..<7 {
-        let pinX = -70 + CGFloat(i) * 21
-        let pinRect = NSRect(x: pinX, y: -120, width: 13, height: 42)
-        let pinPath = NSBezierPath(roundedRect: pinRect, xRadius: 3, yRadius: 3)
-        NSColor(calibratedRed: 0.92, green: 0.72, blue: 0.22, alpha: 1.0).setFill()
-        pinPath.fill()
-    }
-    
-    ctx.restoreGState()
-    
-    // Pencil
-    ctx.saveGState()
-    ctx.translateBy(x: 350, y: 330)
-    ctx.rotate(by: -0.55)
-    
-    let pencilShadow = NSShadow()
-    pencilShadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-    pencilShadow.shadowOffset = NSSize(width: 8, height: -12)
-    pencilShadow.shadowBlurRadius = 12
-    pencilShadow.set()
-    
-    let pencilRect = NSRect(x: -11, y: -150, width: 22, height: 250)
-    let pencilPath = NSBezierPath(roundedRect: pencilRect, xRadius: 11, yRadius: 11)
-    NSColor(calibratedRed: 0.98, green: 0.98, blue: 0.99, alpha: 1.0).setFill()
-    pencilPath.fill()
-    
-    let tipPath = NSBezierPath()
-    tipPath.move(to: NSPoint(x: -11, y: -150))
-    tipPath.line(to: NSPoint(x: 11, y: -150))
-    tipPath.line(to: NSPoint(x: 0, y: -200))
-    tipPath.close()
-    NSColor(calibratedRed: 0.88, green: 0.88, blue: 0.90, alpha: 1.0).setFill()
-    tipPath.fill()
-    
-    let nibPath = NSBezierPath()
-    nibPath.move(to: NSPoint(x: -4, y: -183))
-    nibPath.line(to: NSPoint(x: 4, y: -183))
-    nibPath.line(to: NSPoint(x: 0, y: -200))
-    nibPath.close()
-    NSColor(calibratedRed: 0.20, green: 0.20, blue: 0.22, alpha: 1.0).setFill()
-    nibPath.fill()
-    
-    ctx.restoreGState()
-    
-    image.unlockFocus()
-    return image
+    NSGraphicsContext.current?.restoreGraphicsState()
+
+    NSGraphicsContext.restoreGraphicsState()
+    return bitmap
 }
 
-let lightIcon = renderIcon(isDark: false)
-let darkIcon = renderIcon(isDark: true)
-
-let outputDirectory = CommandLine.arguments.dropFirst().first
-    .map { URL(fileURLWithPath: $0, isDirectory: true) }
-    ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-
-func savePNG(_ image: NSImage, filename: String) {
-    if let tiffData = image.tiffRepresentation,
-       let bitmap = NSBitmapImageRep(data: tiffData),
-       let pngData = bitmap.representation(using: .png, properties: [:]) {
-        let url = outputDirectory.appendingPathComponent(filename)
-        do {
-            try pngData.write(to: url)
-        } catch {
-            fputs("Could not write \(url.path): \(error)\n", stderr)
-            exit(1)
-        }
-    }
+let outputURL: URL
+if let outputPath = CommandLine.arguments.dropFirst().first {
+    outputURL = URL(fileURLWithPath: outputPath)
+} else {
+    outputURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent("AppIconMaster.png")
 }
 
-savePNG(lightIcon, filename: "apple_icon_light_grid.png")
-savePNG(darkIcon, filename: "apple_icon_dark_grid.png")
-print("Created light and dark icon PNGs in \(outputDirectory.path)")
+let bitmap = renderIcon()
+guard let data = bitmap.representation(using: .png, properties: [:]) else {
+    fputs("无法编码 PNG 图标。\n", stderr)
+    exit(1)
+}
+
+do {
+    try data.write(to: outputURL, options: .atomic)
+    print("已生成图标母版：\(outputURL.path)")
+} catch {
+    fputs("无法写入图标：\(error.localizedDescription)\n", stderr)
+    exit(1)
+}

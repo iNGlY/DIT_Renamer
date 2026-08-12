@@ -127,13 +127,21 @@ struct DITRenamerApp: App {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: approvalCoordinator.pendingCount > 0
-                      ? "externaldrive.fill.badge.exclamationmark"
-                      : "externaldrive.fill.badge.checkmark")
+                      ? "sdcard.fill"
+                      : "sdcard")
                 if approvalCoordinator.pendingCount > 0 {
                     Text("\(approvalCoordinator.pendingCount)")
                         .font(.caption2)
                 }
             }
+            .accessibilityLabel(langManager.text(
+                approvalCoordinator.pendingCount > 0
+                    ? "DIT Renamer，\(approvalCoordinator.pendingCount) 张卡待审核"
+                    : "DIT Renamer，没有待审核卡片",
+                approvalCoordinator.pendingCount > 0
+                    ? "DIT Renamer, \(approvalCoordinator.pendingCount) cards awaiting review"
+                    : "DIT Renamer, no cards awaiting review"
+            ))
         }
         .menuBarExtraStyle(.window)
     }

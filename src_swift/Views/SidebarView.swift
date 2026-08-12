@@ -39,7 +39,7 @@ struct SidebarView: View {
         VStack(spacing: 12) {
             // App Title Header
             HStack {
-                Image(systemName: "externaldrive.fill.badge.checkmark")
+                Image(systemName: "sdcard.fill")
                     .foregroundColor(.blue)
                     .font(.title2)
                 VStack(alignment: .leading, spacing: 1) {

@@ -1,33 +1,33 @@
 import AppKit
 
 guard CommandLine.arguments.count >= 2 else {
-    fputs("Usage: swift scripts/make_icns.swift <source.png> [output.iconset]\n", stderr)
+    fputs("用法：swift scripts/make_icns.swift <母版.png> [输出.iconset]\n", stderr)
     exit(2)
 }
 
-let iconURL = URL(fileURLWithPath: CommandLine.arguments[1])
+let sourceURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let iconsetURL = CommandLine.arguments.count >= 3
     ? URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
     : URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         .appendingPathComponent("AppIcon.iconset", isDirectory: true)
 
-guard let baseImage = NSImage(contentsOf: iconURL) else {
-    fputs("Could not load source PNG at \(iconURL.path)\n", stderr)
+guard let sourceImage = NSImage(contentsOf: sourceURL) else {
+    fputs("无法读取图标母版：\(sourceURL.path)\n", stderr)
     exit(1)
 }
 
-let fm = FileManager.default
+let fileManager = FileManager.default
 do {
-    if fm.fileExists(atPath: iconsetURL.path) {
-        try fm.removeItem(at: iconsetURL)
+    if fileManager.fileExists(atPath: iconsetURL.path) {
+        try fileManager.removeItem(at: iconsetURL)
     }
-    try fm.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: iconsetURL, withIntermediateDirectories: true)
 } catch {
-    fputs("Could not prepare \(iconsetURL.path): \(error)\n", stderr)
+    fputs("无法准备 iconset：\(error.localizedDescription)\n", stderr)
     exit(1)
 }
 
-let sizes: [(String, Int)] = [
+let sizes: [(name: String, pixels: Int)] = [
     ("icon_16x16.png", 16),
     ("icon_16x16@2x.png", 32),
     ("icon_32x32.png", 32),
@@ -40,24 +40,45 @@ let sizes: [(String, Int)] = [
     ("icon_512x512@2x.png", 1024)
 ]
 
-for (filename, px) in sizes {
-    let destSize = NSSize(width: px, height: px)
-    let resized = NSImage(size: destSize)
-    resized.lockFocus()
-    baseImage.draw(in: NSRect(origin: .zero, size: destSize), from: NSRect(origin: .zero, size: baseImage.size), operation: .copy, fraction: 1.0)
-    resized.unlockFocus()
-    
-    if let tiffData = resized.tiffRepresentation,
-       let bitmap = NSBitmapImageRep(data: tiffData),
-       let pngData = bitmap.representation(using: .png, properties: [:]) {
-        let destURL = iconsetURL.appendingPathComponent(filename)
-        do {
-            try pngData.write(to: destURL)
-        } catch {
-            fputs("Could not write \(destURL.path): \(error)\n", stderr)
-            exit(1)
-        }
+for item in sizes {
+    guard let bitmap = NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: item.pixels,
+        pixelsHigh: item.pixels,
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ), let graphics = NSGraphicsContext(bitmapImageRep: bitmap) else {
+        fputs("无法创建 \(item.pixels) px 图标。\n", stderr)
+        exit(1)
+    }
+
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphics
+    graphics.imageInterpolation = .high
+    sourceImage.draw(
+        in: NSRect(x: 0, y: 0, width: item.pixels, height: item.pixels),
+        from: NSRect(origin: .zero, size: sourceImage.size),
+        operation: .copy,
+        fraction: 1
+    )
+    NSGraphicsContext.restoreGraphicsState()
+
+    guard let data = bitmap.representation(using: .png, properties: [:]) else {
+        fputs("无法编码 \(item.name)。\n", stderr)
+        exit(1)
+    }
+
+    do {
+        try data.write(to: iconsetURL.appendingPathComponent(item.name), options: .atomic)
+    } catch {
+        fputs("无法写入 \(item.name)：\(error.localizedDescription)\n", stderr)
+        exit(1)
     }
 }
 
-print("Created iconset at \(iconsetURL.path)")
+print("已生成 iconset：\(iconsetURL.path)")

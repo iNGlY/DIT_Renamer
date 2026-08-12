@@ -125,7 +125,7 @@ struct RenameMenuBarView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "externaldrive.fill.badge.checkmark")
+            Image(systemName: "sdcard.fill")
                 .foregroundColor(.blue)
             VStack(alignment: .leading, spacing: 2) {
                 Text("DIT Renamer")
