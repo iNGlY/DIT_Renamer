@@ -124,45 +124,42 @@ struct SidebarView: View {
             
             Divider()
 
-            UpdateActionButton()
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .padding(.horizontal, 10)
-            
-            // Bottom Footer (Language Switcher, Settings & About)
-            HStack {
+            // Bottom Footer (Update, Language, Settings & About)
+            HStack(spacing: 2) {
+                UpdateActionButton(compact: true)
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+
                 Button(action: {
                     langManager.currentLanguage = (langManager.currentLanguage == .zh ? .en : .zh)
                 }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "globe")
-                        Text(langManager.currentLanguage == .zh ? "EN" : "中文")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.secondary)
+                    footerActionLabel(
+                        icon: "globe",
+                        title: langManager.currentLanguage == .zh ? "EN" : "中文"
+                    )
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
                 .help(langManager.text("切换语言 (Switch Language)", "Switch Language"))
-                
-                Spacer()
-                
+
                 Button(action: { onShowSettings() }) {
-                    Image(systemName: "gearshape")
-                        .foregroundColor(.secondary)
+                    footerActionLabel(
+                        icon: "gearshape",
+                        title: langManager.text("设置", "Settings")
+                    )
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
                 .help(langManager.text("偏好设置", "Settings"))
-                
+
                 Button(action: { onShowAbout() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "info.circle")
-                        Text(langManager.text("关于软件", "About"))
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.secondary)
+                    footerActionLabel(
+                        icon: "info.circle",
+                        title: langManager.text("关于", "About")
+                    )
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
                 .help(langManager.text("关于 DIT Renamer", "About DIT Renamer"))
             }
             .padding(.horizontal, 12)
@@ -195,6 +192,19 @@ struct SidebarView: View {
     
     var onShowAbout: () -> Void = {}
     var onShowSettings: () -> Void = {}
+
+    private func footerActionLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+            Text(title)
+                .lineLimit(1)
+        }
+        .font(.caption2)
+        .fontWeight(.medium)
+        .foregroundColor(.secondary)
+        .frame(maxWidth: .infinity, minHeight: 22)
+        .contentShape(Rectangle())
+    }
     
     private func volumeRow(vol: MountedVolume, isIgnored: Bool) -> some View {
         let isRenamed = !vol.isGenericName && RenameHistoryStore.shared.isRenamed(volumeName: vol.name)

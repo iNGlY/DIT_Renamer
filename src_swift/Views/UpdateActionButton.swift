@@ -14,7 +14,7 @@ struct UpdateActionButton: View {
         Button {
             updateController.performUserUpdateAction()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: compact ? 3 : 6) {
                 if updateController.isChecking {
                     ProgressView()
                         .controlSize(.small)
@@ -24,11 +24,13 @@ struct UpdateActionButton: View {
                           : "arrow.down.circle.fill")
                 }
 
-                if !compact || updateController.availableVersion != nil {
-                    Text(buttonTitle)
-                        .lineLimit(1)
-                }
+                Text(compact ? compactTitle : buttonTitle)
+                    .font(compact ? .caption2 : .body)
+                    .fontWeight(compact ? .medium : .regular)
+                    .lineLimit(1)
             }
+            .foregroundColor(compact ? .secondary : .primary)
+            .frame(maxWidth: compact ? .infinity : nil, minHeight: compact ? 22 : nil)
         }
         .disabled(!updateController.canCheckForUpdates || mediaOperations.isBusy)
         .help(helpText)
@@ -43,6 +45,16 @@ struct UpdateActionButton: View {
             return langManager.text("正在检查…", "Checking…")
         }
         return langManager.text("检查更新…", "Check for Updates…")
+    }
+
+    private var compactTitle: String {
+        if let version = updateController.availableVersion {
+            return "v\(version)"
+        }
+        if updateController.isChecking {
+            return langManager.text("检查中", "Checking")
+        }
+        return langManager.text("更新", "Update")
     }
 
     private var helpText: String {
