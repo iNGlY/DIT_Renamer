@@ -14,6 +14,8 @@ final class RenameApprovalCoordinator: ObservableObject {
     private var scanGenerations: [String: UUID] = [:]
     private var scannedVolumeKeys = Set<String>()
     private var excludedMountPaths = Set<String>()
+    private var mountedNamesByBSDNode: [String: String] = [:]
+    private var externalScanIDs = Set<UUID>()
     private let automaticRenameQueue = AutomaticRenameQueue()
 
     private init() {
@@ -22,12 +24,16 @@ final class RenameApprovalCoordinator: ObservableObject {
 
     var pendingCount: Int { pendingCandidates.filter { $0.state == .pending || $0.state == .failed }.count }
     var batchCandidates: [RenameCandidate] {
-        pendingCandidates.filter { $0.isSafeForAutomaticApproval(among: pendingCandidates) }
+        guard RenameOperationPolicy.allowsExecution(via: .batchApproval, isScanning: isScanning) else { return [] }
+        return pendingCandidates.filter { isSafeForAutomaticApproval($0) }
     }
 
     func refresh(volumes: [MountedVolume]) {
         isScanning = true
         let eligible = volumes.filter { $0.isRemovable && !$0.isInternal && $0.volumeUUID != nil }
+        mountedNamesByBSDNode = Dictionary(uniqueKeysWithValues: eligible.map {
+            ($0.bsdNode, Self.normalizeVolumeName($0.name))
+        })
         let mountedSessionIDs = Set(eligible.compactMap(\.mountSessionID))
         let activeVolumeIDs = Set(eligible.map(\.id))
         for id in Array(scanTasks.keys) where !activeVolumeIDs.contains(id) {
@@ -53,7 +59,8 @@ final class RenameApprovalCoordinator: ObservableObject {
                 await self?.accept(scan: scan, volume: volume, generation: generation)
             }
         }
-        isScanning = !scanTasks.isEmpty
+        updateScanningState()
+        if !isScanning { enqueueAllSafeAutomaticCandidates() }
     }
 
     func rescan(volumes: [MountedVolume]) {
@@ -75,6 +82,19 @@ final class RenameApprovalCoordinator: ObservableObject {
         syncFromStore()
     }
 
+    func beginExternalScan() -> UUID {
+        let id = UUID()
+        externalScanIDs.insert(id)
+        updateScanningState()
+        return id
+    }
+
+    func endExternalScan(_ id: UUID) {
+        externalScanIDs.remove(id)
+        updateScanningState()
+        if !isScanning { enqueueAllSafeAutomaticCandidates() }
+    }
+
     func ingest(volume: MountedVolume, scan: ScanResult, requestedName: String? = nil) -> RenameCandidate? {
         guard scan.isScanComplete, volume.volumeUUID != nil else { return nil }
         guard !scan.isEmptyCard, !scan.isPhotoOnly, !scan.isUnformattedCard else { return nil }
@@ -87,6 +107,9 @@ final class RenameApprovalCoordinator: ObservableObject {
     }
 
     func approveSuggestedName(candidateID: UUID) async -> RenameExecutionResult {
+        guard RenameOperationPolicy.allowsExecution(via: .suggestedApproval, isScanning: isScanning) else {
+            return finish(candidateID: candidateID, success: false, message: "仍有存储卡正在扫描。请等待全部已插入卡片完成扫描后再批准。", actualName: nil)
+        }
         guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }) else {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
         }
@@ -96,10 +119,21 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard let name = candidate.effectiveName else {
             return finish(candidateID: candidateID, success: false, message: "没有可批准的建议卷名。", actualName: nil)
         }
+        guard !hasTargetNameConflict(for: candidate) else {
+            return finish(
+                candidateID: candidateID,
+                success: false,
+                message: "检测到另一张已挂载卡也将使用卷名 \(name.uppercased())。为避免 Silverstack 再次出现同名卡，请先手动为其中一张指派不同卷号。",
+                actualName: nil
+            )
+        }
         return await execute(candidate: candidate, requestedName: name)
     }
 
     func assignVolumeName(candidateID: UUID, request: VolumeNameRequest) async -> RenameExecutionResult {
+        guard RenameOperationPolicy.allowsExecution(via: .manualAssignment, isScanning: isScanning) else {
+            return finish(candidateID: candidateID, success: false, message: "仍有存储卡正在扫描。请等待全部已插入卡片完成扫描后再执行重命名。", actualName: nil)
+        }
         guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }) else {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
         }
@@ -112,13 +146,29 @@ final class RenameApprovalCoordinator: ObservableObject {
             updated.requestedName = name
             store.update(updated)
             syncFromStore()
-            return await execute(candidate: updated, requestedName: name)
+            guard !hasTargetNameConflict(for: updated) else {
+                return finish(
+                    candidateID: candidateID,
+                    success: false,
+                    message: "卷名 \(name) 已被另一张已挂载卡占用。请为其中一张卡指派不同卷号后再执行。",
+                    actualName: nil
+                )
+            }
+            return await execute(
+                candidate: updated,
+                requestedName: name,
+                reuseCount: request.recordedReuseCount,
+                duplicateIndex: request.duplicateIndex
+            )
         } catch {
             return finish(candidateID: candidateID, success: false, message: error.localizedDescription, actualName: nil)
         }
     }
 
     func approveBatch() async -> [RenameExecutionResult] {
+        guard RenameOperationPolicy.allowsExecution(via: .batchApproval, isScanning: isScanning) else {
+            return [finish(candidateID: UUID(), success: false, message: "仍有存储卡正在扫描，批量批准已暂停。", actualName: nil)]
+        }
         var results: [RenameExecutionResult] = []
         for candidate in batchCandidates {
             let result = await approveSuggestedName(candidateID: candidate.id)
@@ -131,6 +181,76 @@ final class RenameApprovalCoordinator: ObservableObject {
     func dismiss(candidateID: UUID) {
         store.remove(id: candidateID)
         syncFromStore()
+        enqueueAllSafeAutomaticCandidates()
+    }
+
+    @discardableResult
+    func enqueueAutomaticApproval(candidateID: UUID) -> Bool {
+        guard RenameOperationPolicy.allowsExecution(via: .automatic, isScanning: isScanning) else { return false }
+        guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }),
+              isSafeForAutomaticApproval(candidate) else { return false }
+        automaticRenameQueue.enqueue(candidate.id) { [weak self] queuedCandidateID in
+            guard let self else { return }
+            while self.isScanning || MediaOperationCoordinator.shared.isBusy {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+            guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled"),
+                  let current = self.pendingCandidates.first(where: { $0.id == queuedCandidateID }) else { return }
+            guard self.isSafeForAutomaticApproval(current) else {
+                if self.hasTargetNameConflict(for: current) {
+                    _ = self.finish(
+                        candidateID: queuedCandidateID,
+                        success: false,
+                        message: "自动重命名已暂停：卷名 \(current.effectiveName ?? "—") 已被另一张卡占用。请在手动工作区勾选“机位号重复”，使用 _1、_2 等冲突编号。",
+                        actualName: nil
+                    )
+                }
+                return
+            }
+            _ = await self.approveSuggestedName(candidateID: queuedCandidateID)
+        }
+        return true
+    }
+
+    func hasTargetNameConflict(for candidate: RenameCandidate) -> Bool {
+        candidate.hasConflictingTargetName(
+            among: pendingCandidates,
+            occupiedNames: occupiedMountedNames(excludingBSDNode: candidate.bsdNode)
+        )
+    }
+
+    func isSafeForAutomaticApproval(_ candidate: RenameCandidate) -> Bool {
+        RenameOperationPolicy.allowsExecution(via: .automatic, isScanning: isScanning)
+            && candidate.isSafeForAutomaticApproval(
+            among: pendingCandidates,
+            occupiedNames: occupiedMountedNames(excludingBSDNode: candidate.bsdNode)
+        )
+    }
+
+    func nextAvailableDuplicateIndex(
+        for request: VolumeNameRequest,
+        fileSystem: String,
+        excludingCandidateID: UUID? = nil,
+        excludingBSDNode: String? = nil
+    ) -> Int? {
+        let candidateBSDNode = excludingBSDNode ?? excludingCandidateID.flatMap { id in
+            pendingCandidates.first(where: { $0.id == id })?.bsdNode
+        }
+        let otherCandidates = pendingCandidates.filter {
+            $0.id != excludingCandidateID
+                && $0.bsdNode != candidateBSDNode
+                && $0.state != .stale
+        }
+        let occupied = occupiedMountedNames(excludingBSDNode: candidateBSDNode)
+        for index in 1...999 {
+            var proposed = request
+            proposed.duplicateIndex = index
+            guard let name = try? VolumeNameBuilder.build(proposed, fileSystem: fileSystem) else { continue }
+            let normalized = Self.normalizeVolumeName(name)
+            let pendingConflict = otherCandidates.contains { $0.normalizedEffectiveName == normalized }
+            if !pendingConflict && !occupied.contains(normalized) { return index }
+        }
+        return nil
     }
 
     func rescan(candidateID: UUID) {
@@ -154,6 +274,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         scanTasks[volume.id]?.cancel()
         let generation = UUID()
         scanGenerations[volume.id] = generation
+        isScanning = true
         scanTasks[volume.id] = Task.detached(priority: .userInitiated) { [weak self] in
             let scan = MediaScanner.scan(volumePath: volume.path)
             guard !Task.isCancelled else { return }
@@ -165,31 +286,22 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard scanGenerations[volume.id] == generation else { return }
         scanTasks[volume.id] = nil
         scanGenerations[volume.id] = nil
+        updateScanningState()
         guard !excludedMountPaths.contains(volume.path) else {
-            isScanning = !scanTasks.isEmpty
             return
         }
         if scan.isScanComplete, let candidate = ingest(volume: volume, scan: scan) {
-            let automatic = UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled")
-            if automatic
-                && volume.isGenericName
-                && candidate.isSafeForAutomaticApproval(among: pendingCandidates) {
-                automaticRenameQueue.enqueue(candidate.id) { [weak self] candidateID in
-                    guard let self else { return }
-                    while self.isScanning || MediaOperationCoordinator.shared.isBusy {
-                        try? await Task.sleep(nanoseconds: 200_000_000)
-                    }
-                    guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled"),
-                          let current = self.pendingCandidates.first(where: { $0.id == candidateID }),
-                          current.isSafeForAutomaticApproval(among: self.pendingCandidates) else { return }
-                    _ = await self.approveSuggestedName(candidateID: candidateID)
-                }
-            }
+            _ = candidate
         }
-        isScanning = !scanTasks.isEmpty
+        if !isScanning { enqueueAllSafeAutomaticCandidates() }
     }
 
-    private func execute(candidate: RenameCandidate, requestedName: String) async -> RenameExecutionResult {
+    private func execute(
+        candidate: RenameCandidate,
+        requestedName: String,
+        reuseCount: Int? = nil,
+        duplicateIndex: Int? = nil
+    ) async -> RenameExecutionResult {
         guard !MediaOperationCoordinator.shared.isBusy else {
             return finish(candidateID: candidate.id, success: false, message: "当前已有存储卡操作正在执行。", actualName: nil)
         }
@@ -247,6 +359,8 @@ final class RenameApprovalCoordinator: ObservableObject {
             isUnformatted: candidate.isUnformatted,
             isEmptyCard: candidate.isEmptyCard,
             requestedName: requestedName,
+            reuseCount: reuseCount,
+            duplicateIndex: duplicateIndex,
             volumeUUID: candidate.volumeUUID,
             mediaUUID: candidate.mediaUUID,
             bsdNode: candidate.bsdNode,
@@ -260,6 +374,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             syncFromStore()
             return finish(candidateID: candidate.id, success: false, message: failed.lastError!, actualName: actualName)
         }
+        mountedNamesByBSDNode[candidate.bsdNode] = Self.normalizeVolumeName(actualName)
         store.remove(id: candidate.id)
         syncFromStore()
         return finish(candidateID: candidate.id, success: true, message: result.message, actualName: actualName)
@@ -272,6 +387,30 @@ final class RenameApprovalCoordinator: ObservableObject {
     }
 
     private func syncFromStore() { pendingCandidates = store.candidates }
+
+    private func updateScanningState() {
+        isScanning = !scanTasks.isEmpty || !externalScanIDs.isEmpty
+    }
+
+    private func enqueueAllSafeAutomaticCandidates() {
+        guard !isScanning,
+              UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled") else { return }
+        for candidate in pendingCandidates where isSafeForAutomaticApproval(candidate) {
+            enqueueAutomaticApproval(candidateID: candidate.id)
+        }
+    }
+
+    private func occupiedMountedNames(excludingBSDNode: String?) -> Set<String> {
+        Set(mountedNamesByBSDNode.compactMap { bsdNode, name in
+            bsdNode == excludingBSDNode ? nil : name
+        })
+    }
+
+    private static func normalizeVolumeName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .precomposedStringWithCanonicalMapping
+            .uppercased()
+    }
 
     private static func dayString(for date: Date) -> String {
         let formatter = DateFormatter()

@@ -200,6 +200,8 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
     public var isUnformatted: Bool? = false
     public var isEmptyCard: Bool? = false
     public var requestedName: String? = nil
+    public var reuseCount: Int? = nil
+    public var duplicateIndex: Int? = nil
     public var volumeUUID: String? = nil
     public var mediaUUID: String? = nil
     public var bsdNode: String? = nil
@@ -225,6 +227,8 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
                 isUnformatted: Bool? = false,
                 isEmptyCard: Bool? = false,
                 requestedName: String? = nil,
+                reuseCount: Int? = nil,
+                duplicateIndex: Int? = nil,
                 volumeUUID: String? = nil,
                 mediaUUID: String? = nil,
                 bsdNode: String? = nil,
@@ -243,6 +247,8 @@ public struct RenameHistoryItem: Identifiable, Codable, Hashable {
         self.isUnformatted = isUnformatted
         self.isEmptyCard = isEmptyCard
         self.requestedName = requestedName
+        self.reuseCount = reuseCount
+        self.duplicateIndex = duplicateIndex
         self.volumeUUID = volumeUUID
         self.mediaUUID = mediaUUID
         self.bsdNode = bsdNode

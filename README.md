@@ -29,12 +29,13 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 
 - 只读扫描可移除摄影机媒体，并根据目录、素材名和可用元数据给出卷名建议。
 - 默认驻留菜单栏并在后台监听新卡；只有需要人工确认、发生失败或用户主动打开时才显示主窗口。
-- 允许人工调整机位、卷号、卡片复用次数，并选择是否保留检测到的 suffix。
+- 允许人工调整机位和卷号、用 `_1`、`_2` 处理重复机位冲突，并选择是否保留检测到的 suffix。卡片复用次数为默认关闭的可选审计/标签字段，不参与实际卷名。
 - 对 FAT、MS-DOS 和 exFAT 卷名执行 11 字符上限，不会静默截断输入。
-- 在菜单栏快速查看待人工审核的卡片，批准建议卷名，手动指派机位/卷号/复用次数/素材后缀，并可逐张批量批准高置信度卡片。
+- 在菜单栏快速查看待人工审核的卡片，批准建议卷名，手动指派机位/卷号/重复机位编号/素材后缀，并可选择记录仅供审计和标签使用的卡片复用次数。
 - 菜单栏可查看和忽略已挂载卡片、恢复忽略项、重新扫描、切换自动重命名、调整过滤规则、检查更新及打开设置。
 - 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
 - 两张同名卡同时挂载时，使用真实卷标而不是 macOS 自动添加编号的挂载目录名；即使 Volume UUID 相同，也按 BSD 节点与首末素材分别处理，并严格串行执行重命名与重挂载。
+- 两张已挂载卡若建议或手动目标卷名相同（例如两台 FX3 都为 `A001`），自动和批量重命名会同时暂停；DIT 必须先给至少一张加入 `_1`、`_2` 等冲突编号，或手动改为其他卷号。队列延迟只用于等待同时插入的卡完成扫描，最终仍以执行前的全体目标名复核为准。
 - 优先从 Sony XML/XMP 读取具体机型；需要时可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
 - 覆盖 Sony FX3 的 `PRIVATE/M4ROOT/CLIP` + MP4 和 FX6 的 `XDROOT/Clip` + MXF 结构；具体型号仍以 XML/XMP 或可选 exiftool 元数据为准。
 - 保存原卷名、新卷名、UUID、BSD 节点、首末素材和操作时间。
@@ -53,6 +54,7 @@ DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.0 App 中。Renamer �
 - `Untitled` 是 Sony FX3/FX6 等设备可能使用的默认卷名，不应直接用于备份盘。本软件处理的是摄影机卡，不负责为名为 `Untitled` 的备份盘提供服务。
 - 卷名建议始终需要现场人员判断。厂商结构或机型证据不足时，应保留原卷名或手动输入。
 - 当两张卡的 Volume UUID、首素材和末素材全部相同，软件会把它们视为疑似克隆介质，保留独立待办但禁止自动或批量批准，需要人工确认。
+- 当两张不同素材卡得到相同目标卷名时，也会禁止自动或批量批准；手动工作区可勾选“机位号重复”，自动选择当前可用的 `_1`、`_2` 等冲突编号，例如将第二张 `A001` 改为 `A001_1`。
 
 重命名前，停止 Silverstack、Finder 以及其他正在访问目标卡的任务。拔卡、换卡或设备节点变化后，应重新选择并扫描。先在可丢弃测试卡上验证工作流，再用于正式素材。
 
@@ -97,12 +99,13 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 
 - Scans removable camera media without changing card contents, then suggests a volume name from folder, clip-name, and metadata evidence.
 - Runs primarily from the menu bar and monitors for new cards in the background. The main window appears only for operator attention, failures, or an explicit request.
-- Lets the operator adjust camera ID, roll number, card reuse count, and whether to keep a detected suffix.
+- Lets the operator adjust camera ID and roll, resolve duplicate camera IDs with `_1`, `_2`, and so on, and choose whether to keep a detected suffix. Card reuse count is an optional audit/label field that is off by default and never changes the actual volume name.
 - Enforces the 11-character FAT, MS-DOS, and exFAT volume-name limit without silently shortening input.
-- Adds a menu-bar review panel for approving suggested names, assigning camera ID/roll/reuse/suffix values, and sequentially approving multiple high-confidence cards.
+- Adds a menu-bar review panel for approving suggested names, assigning camera ID/roll/duplicate index/suffix values, optionally recording reuse metadata for audits and labels, and sequentially approving multiple high-confidence cards.
 - The menu bar also exposes mounted-card actions, ignore/restore controls, rescanning, auto-rename, filtering rules, updates, and settings.
 - Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
 - When two same-name cards are mounted together, the app uses the real volume label instead of macOS's collision-suffixed mount-directory name. Cards sharing a Volume UUID remain distinct by BSD node and first/last clip evidence, and rename/remount operations run strictly in sequence.
+- If two mounted cards have the same suggested or manually requested target name—for example, two FX3 cards both resolving to `A001`—automatic and batch renaming pause for both. The DIT must append `_1`, `_2`, and so on to at least one card, or assign another roll manually. Queue delays only allow simultaneous cards to finish scanning; the final safeguard is the all-candidate target-name check immediately before execution.
 - Reads Sony XML/XMP metadata first. Optional exiftool detection can inspect one representative clip when needed and can be disabled in Settings.
 - Covers Sony FX3 `PRIVATE/M4ROOT/CLIP` + MP4 and FX6 `XDROOT/Clip` + MXF structures. Exact model labels still require XML/XMP or optional exiftool metadata.
 - Records original and new names, UUIDs, BSD node, first and last clips, and operation time.
@@ -121,6 +124,7 @@ DIT Printer is a separate component and is not included in the DIT Renamer 1.2.0
 - `Untitled` may be the default volume name on cameras including the Sony FX3 and FX6. It should not be used as a backup-volume name; backup drives named `Untitled` are outside this application's scope.
 - Every suggested name remains an operator decision. Keep the existing name or enter one manually when vendor or model evidence is incomplete.
 - If two mounted cards share the same Volume UUID and the same first and last clip names, they remain separate review items but automatic and batch approval are disabled until an operator confirms them.
+- Different cards that resolve to the same target volume name are also blocked from automatic and batch approval. The manual workspace can append the next available `_1`, `_2`, and so on—for example, changing the second `A001` to `A001_1`.
 
 Before renaming, stop Silverstack, Finder, and any other process using the card. Select and scan again after a card is removed, replaced, or assigned a different device node. Test the workflow with a disposable card before using production media.
 

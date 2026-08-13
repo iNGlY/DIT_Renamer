@@ -168,7 +168,7 @@ final class OperatorAttentionCenter: NSObject, ObservableObject, UNUserNotificat
         let automatic = defaults.bool(forKey: "menuBarAutoRenameEnabled")
         for candidate in candidates where !known.contains(candidate.mountedIdentityKey) {
             known.insert(candidate.mountedIdentityKey)
-            if automatic && candidate.isSafeForAutomaticApproval(among: candidates) { continue }
+            if automatic && RenameApprovalCoordinator.shared.isSafeForAutomaticApproval(candidate) { continue }
             notifyReviewRequired(candidate)
         }
         saveKnownIdentities(known)

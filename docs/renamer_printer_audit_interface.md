@@ -23,6 +23,8 @@ Renamer replaces the snapshot atomically after saving or reloading rename histor
       "original_name": "Untitled",
       "actual_name": "A001",
       "requested_name": "A001",
+      "reuse_count": 2,
+      "duplicate_index": 1,
       "volume_uuid": "...",
       "media_uuid": "...",
       "bsd_node": "disk4s1",
@@ -37,3 +39,5 @@ Renamer replaces the snapshot atomically after saving or reloading rename histor
 ```
 
 `recorded_mount_path` is the path recorded before the rename. Printer compares its optional `source_volume_path` with that path and with `actual_name` or `requested_name` as the current mounted volume name. A match only adds read-only context to a label. It does not change a Silverstack job or grant permission to erase a card.
+
+`reuse_count` is optional DIT metadata for label and audit output only. It never changes `actual_name` or `requested_name`, and the key is omitted when the operator leaves reuse recording disabled. `duplicate_index` records an explicit same-camera-ID conflict suffix such as `_1`.

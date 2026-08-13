@@ -28,7 +28,9 @@ struct RenameMenuBarView: View {
     @State private var notice: String?
     @State private var cameraLetter = "A"
     @State private var rollNumber = "001"
-    @State private var reuseCount = "0"
+    @State private var reuseCount = ""
+    @State private var includeReuseCount = false
+    @State private var duplicateCameraID = false
     @State private var includeSuffix = true
 
     private enum MenuSection: String, CaseIterable, Identifiable {
@@ -208,7 +210,7 @@ struct RenameMenuBarView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(MediaOperationCoordinator.shared.isBusy)
+                .disabled(coordinator.isScanning || MediaOperationCoordinator.shared.isBusy)
             }
 
             if let selectedCandidate {
@@ -350,10 +352,12 @@ struct RenameMenuBarView: View {
     }
 
     private func candidateRow(_ candidate: RenameCandidate) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let isAutomaticSafe = coordinator.isSafeForAutomaticApproval(candidate)
+        let hasTargetConflict = coordinator.hasTargetNameConflict(for: candidate)
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Image(systemName: candidate.canBeBatchApproved ? "checkmark.seal" : "exclamationmark.triangle")
-                    .foregroundColor(candidate.canBeBatchApproved ? .green : .orange)
+                Image(systemName: isAutomaticSafe ? "checkmark.seal" : "exclamationmark.triangle")
+                    .foregroundColor(isAutomaticSafe ? .green : .orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(candidate.originalName).font(.headline)
                     Text("\(candidate.deviceType) · /dev/\(candidate.bsdNode)")
@@ -374,12 +378,22 @@ struct RenameMenuBarView: View {
                 Text(error).font(.caption).foregroundColor(.red).fixedSize(horizontal: false, vertical: true)
             }
 
+            if hasTargetConflict {
+                Text(langManager.text(
+                    "另一张卡也建议使用这个卷名。请先手动为其中一张指派不同卷号。",
+                    "Another card has the same suggested volume name. Assign a different roll to one card first."
+                ))
+                .font(.caption)
+                .foregroundColor(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack(spacing: 8) {
                 Button(langManager.text("批准", "Approve")) {
                     Task { notice = await coordinator.approveSuggestedName(candidateID: candidate.id).message }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(candidate.effectiveName == nil || candidate.state == .approving || candidate.state == .stale || MediaOperationCoordinator.shared.isBusy)
+                .disabled(candidate.effectiveName == nil || coordinator.isScanning || candidate.state == .approving || candidate.state == .stale || hasTargetConflict || MediaOperationCoordinator.shared.isBusy)
 
                 Button(langManager.text("手动指派", "Assign")) { prepareAssignment(candidate) }
                     .buttonStyle(.bordered)
@@ -406,7 +420,9 @@ struct RenameMenuBarView: View {
         let rest = String(parsed.dropFirst())
         let detectedRoll = String(rest.prefix { $0.isNumber })
         rollNumber = detectedRoll.isEmpty ? "001" : detectedRoll
-        reuseCount = "0"
+        reuseCount = ""
+        includeReuseCount = false
+        duplicateCameraID = coordinator.hasTargetNameConflict(for: candidate)
         includeSuffix = candidate.suffix != nil
     }
 
@@ -422,20 +438,24 @@ struct RenameMenuBarView: View {
             HStack(spacing: 8) {
                 TextField("A", text: $cameraLetter).frame(width: 44)
                 TextField("001", text: $rollNumber)
-                TextField("0", text: $reuseCount)
             }
             .textFieldStyle(.roundedBorder)
+
+            Toggle(langManager.text("机位号重复（自动增加 _1、_2…）", "Duplicate Camera ID (append _1, _2…)"), isOn: $duplicateCameraID)
+                .toggleStyle(.switch).controlSize(.small)
+
+            Toggle(langManager.text("记录卡片复用次数", "Record Card Reuse Count"), isOn: $includeReuseCount)
+                .toggleStyle(.switch).controlSize(.small)
+
+            if includeReuseCount {
+                TextField(langManager.text("复用次数（仅审计/标签）", "Reuse count (audit/label only)"), text: $reuseCount)
+                    .textFieldStyle(.roundedBorder)
+            }
 
             Toggle(langManager.text("保留素材后缀", "Keep media suffix"), isOn: $includeSuffix)
                 .toggleStyle(.switch).controlSize(.small)
 
-            let request = VolumeNameRequest(
-                cameraLetter: cameraLetter,
-                rollNumber: rollNumber,
-                reuseCount: Int(reuseCount) ?? 0,
-                suffix: candidate.suffix,
-                includeSuffix: includeSuffix
-            )
+            let request = assignmentRequest(for: candidate)
             let preview = try? VolumeNameBuilder.build(request, fileSystem: candidate.fileSystem)
             Text(preview ?? langManager.text("卷名格式无效", "Invalid volume name"))
                 .font(.system(.body, design: .monospaced))
@@ -452,11 +472,31 @@ struct RenameMenuBarView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(preview == nil || candidate.state == .stale || MediaOperationCoordinator.shared.isBusy)
+            .disabled(preview == nil || coordinator.isScanning || candidate.state == .stale || MediaOperationCoordinator.shared.isBusy)
         }
         .padding(10)
         .background(Color.blue.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func assignmentRequest(for candidate: RenameCandidate) -> VolumeNameRequest {
+        var request = VolumeNameRequest(
+            cameraLetter: cameraLetter,
+            rollNumber: rollNumber,
+            reuseCount: includeReuseCount ? Int(reuseCount) : nil,
+            includeReuseCount: includeReuseCount,
+            duplicateIndex: nil,
+            suffix: candidate.suffix,
+            includeSuffix: includeSuffix
+        )
+        if duplicateCameraID {
+            request.duplicateIndex = coordinator.nextAvailableDuplicateIndex(
+                for: request,
+                fileSystem: candidate.fileSystem,
+                excludingCandidateID: candidate.id
+            ) ?? 0
+        }
+        return request
     }
 
     private func ruleToggle(_ title: String, binding: Binding<Bool>) -> some View {

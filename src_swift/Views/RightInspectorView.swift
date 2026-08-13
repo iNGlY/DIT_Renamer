@@ -548,21 +548,7 @@ struct RightInspectorView: View {
     }
     
     private func exportCSV(for items: [RenameHistoryItem], dateStr: String) {
-        var csvString = "\u{FEFF}Original Name,New Name,First Clip,Last Clip,Clip Count,Total Files,Used Space,Device Type,Time\n"
-        for item in items {
-            let fields = [
-                item.originalName,
-                item.newName,
-                item.firstClipName ?? "-",
-                item.lastClipName ?? "-",
-                String(item.clipCount),
-                String(item.totalFileCount),
-                item.usedSpace,
-                item.deviceType,
-                item.formattedTime
-            ]
-            csvString += fields.map(csvField).joined(separator: ",") + "\n"
-        }
+        let csvString = RenameAuditFormatting.csvDocument(items: items)
         
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.commaSeparatedText]
@@ -578,11 +564,6 @@ struct RightInspectorView: View {
         }
     }
 
-    private func csvField(_ value: String) -> String {
-        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
-    }
-    
     private func exportMultipleDays() {
         let sortedDays = selectedExportDays.sorted(by: >)
         let allItems = sortedDays.flatMap { day in

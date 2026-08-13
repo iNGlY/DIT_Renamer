@@ -12,11 +12,14 @@ struct MainDetailView: View {
     @State private var scanVolumeID: String? = nil
     @State private var selectedLetter: String = "A"
     @State private var rollInput: String = "001"
-    @State private var reuseInput: String = "0"
+    @State private var reuseInput: String = ""
+    @State private var includeReuseCount: Bool = false
+    @State private var duplicateCameraID: Bool = false
     @State private var includeDetectedSuffix: Bool = true
     @State private var alertMessage: String? = nil
     @State private var isRenaming = false
     @State private var isSuspiciousWarning = false
+    @State private var externalScanID: UUID?
     
     enum ActiveAlert: Identifiable {
         case confirmForce(volName: String)
@@ -35,14 +38,31 @@ struct MainDetailView: View {
     let letters = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map { String($0) }
     
     var previewNewName: String {
-        let request = VolumeNameRequest(
+        builtVolumeName ?? langManager.text("卷名无效", "Invalid name")
+    }
+
+    private var builtVolumeName: String? {
+        try? VolumeNameBuilder.build(currentVolumeNameRequest, fileSystem: volume?.fileSystem ?? "")
+    }
+
+    private var currentVolumeNameRequest: VolumeNameRequest {
+        var request = VolumeNameRequest(
             cameraLetter: selectedLetter,
             rollNumber: rollInput,
-            reuseCount: Int(reuseInput) ?? 0,
+            reuseCount: includeReuseCount ? Int(reuseInput) : nil,
+            includeReuseCount: includeReuseCount,
+            duplicateIndex: nil,
             suffix: scanResult?.suffix,
             includeSuffix: includeDetectedSuffix
         )
-        return (try? VolumeNameBuilder.build(request, fileSystem: volume?.fileSystem ?? "")) ?? "\(selectedLetter.uppercased())\(rollInput)"
+        if duplicateCameraID {
+            request.duplicateIndex = approvalCoordinator.nextAvailableDuplicateIndex(
+                for: request,
+                fileSystem: volume?.fileSystem ?? "",
+                excludingBSDNode: volume?.bsdNode
+            ) ?? 0
+        }
+        return request
     }
 
     var body: some View {
@@ -244,17 +264,31 @@ struct MainDetailView: View {
                                             .font(.system(.body, design: .monospaced))
                                     }
                                     
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(langManager.text("卡片复用次数 (REUSE COUNT)", "REUSE COUNT"))
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                        TextField("0", text: $reuseInput)
-                                            .textFieldStyle(.roundedBorder)
-                                            .font(.system(.body, design: .monospaced))
+                                    Toggle(langManager.text("记录卡片复用次数", "Record Card Reuse Count"), isOn: $includeReuseCount)
+                                        .toggleStyle(.switch)
+                                        .controlSize(.small)
+
+                                    if includeReuseCount {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(langManager.text("卡片复用次数（仅审计/标签）", "CARD REUSE COUNT (AUDIT/LABEL ONLY)"))
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            TextField(langManager.text("留空", "Blank"), text: $reuseInput)
+                                                .textFieldStyle(.roundedBorder)
+                                                .font(.system(.body, design: .monospaced))
+                                        }
                                     }
                                 }
                                 .frame(minWidth: compactLayout ? nil : 150)
                             }
+
+                            Toggle(langManager.text("机位号重复（自动增加 _1、_2…）", "Duplicate Camera ID (append _1, _2…)"), isOn: $duplicateCameraID)
+                                .toggleStyle(.switch)
+                                .controlSize(.small)
+                                .help(langManager.text(
+                                    "用于两台摄影机误用同一机位与卷号的情况；不会改变原始卷号含义。",
+                                    "Use when two cameras share the same camera ID and roll; the original roll meaning is preserved."
+                                ))
 
                             if let suffix = scanResult?.suffix {
                                 HStack(spacing: 10) {
@@ -328,7 +362,7 @@ struct MainDetailView: View {
                             .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
-                        .disabled(isRenaming)
+                        .disabled(isRenaming || builtVolumeName == nil)
                     }
                     
                 } else {
@@ -441,33 +475,29 @@ struct MainDetailView: View {
         guard let v = volume, let result = scanResult else { return }
         guard !isRenaming, scanVolumeID == v.id, result.isScanComplete else { return }
         
-        let targetName = previewNewName
+        guard let targetName = builtVolumeName else { return }
         guard let candidate = approvalCoordinator.ingest(volume: v, scan: result, requestedName: targetName) else { return }
 
         if isAutoRenameEnabled
             && v.isGenericName
-            && candidate.canBeBatchApproved {
-            Task {
-                _ = await approvalCoordinator.approveSuggestedName(candidateID: candidate.id)
-            }
+            && approvalCoordinator.isSafeForAutomaticApproval(candidate) {
+            approvalCoordinator.enqueueAutomaticApproval(candidateID: candidate.id)
         }
     }
 
     private func performRename() {
         guard let vol = volume else { return }
         guard !isRenaming, let result = scanResult, scanVolumeID == vol.id else { return }
-        guard let candidate = approvalCoordinator.ingest(volume: vol, scan: result, requestedName: previewNewName) else {
+        guard let builtVolumeName else {
+            activeAlert = .resultNotice(message: langManager.text("卷名或复用次数输入无效，请检查后重试。", "The volume name or reuse-count input is invalid. Review it and try again."))
+            return
+        }
+        guard let candidate = approvalCoordinator.ingest(volume: vol, scan: result, requestedName: builtVolumeName) else {
             activeAlert = .resultNotice(message: langManager.text("当前卡片无法进入安全审批队列，请重新扫描后再试。", "This card could not enter the safe approval queue. Rescan it and try again."))
             return
         }
         isRenaming = true
-        let request = VolumeNameRequest(
-            cameraLetter: selectedLetter,
-            rollNumber: rollInput,
-            reuseCount: Int(reuseInput) ?? 0,
-            suffix: result.suffix,
-            includeSuffix: includeDetectedSuffix
-        )
+        let request = currentVolumeNameRequest
         Task {
             let execution = await approvalCoordinator.assignVolumeName(candidateID: candidate.id, request: request)
             isRenaming = false
@@ -480,23 +510,40 @@ struct MainDetailView: View {
     }
     
     private func startScan(for selectedVolume: MountedVolume?) {
+        if let externalScanID {
+            approvalCoordinator.endExternalScan(externalScanID)
+            self.externalScanID = nil
+        }
         scanResult = nil
         scanVolumeID = selectedVolume?.id
         includeDetectedSuffix = true
+        duplicateCameraID = false
+        includeReuseCount = false
+        reuseInput = ""
         isSuspiciousWarning = false
         guard let selectedVolume else { return }
 
         let volumeID = selectedVolume.id
+        let registeredScanID = approvalCoordinator.beginExternalScan()
+        externalScanID = registeredScanID
         DispatchQueue.global(qos: .userInitiated).async {
             let result = MediaScanner.scan(volumePath: selectedVolume.path)
             DispatchQueue.main.async {
-                guard self.volume?.id == volumeID, self.scanVolumeID == volumeID else { return }
+                guard self.volume?.id == volumeID, self.scanVolumeID == volumeID else {
+                    self.approvalCoordinator.endExternalScan(registeredScanID)
+                    if self.externalScanID == registeredScanID { self.externalScanID = nil }
+                    return
+                }
                 self.scanResult = result
                 if let letter = result.cameraLetter { self.selectedLetter = letter }
                 if let roll = result.rollNumber { self.rollInput = roll }
                 self.isSuspiciousWarning = self.isAutoRenameEnabled &&
                     (!result.isHighConfidence || !selectedVolume.isGenericName)
-                _ = self.approvalCoordinator.ingest(volume: selectedVolume, scan: result, requestedName: self.previewNewName)
+                if let builtVolumeName = self.builtVolumeName {
+                    _ = self.approvalCoordinator.ingest(volume: selectedVolume, scan: result, requestedName: builtVolumeName)
+                }
+                self.approvalCoordinator.endExternalScan(registeredScanID)
+                if self.externalScanID == registeredScanID { self.externalScanID = nil }
                 self.checkAndAutoRename()
             }
         }

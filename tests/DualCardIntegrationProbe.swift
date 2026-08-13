@@ -23,8 +23,8 @@ struct DualCardIntegrationProbe {
 
         let scanA = MediaScanner.scan(volumePath: pathA)
         let scanB = MediaScanner.scan(volumePath: pathB)
-        precondition(scanA.isHighConfidence && scanA.suggestedName == "A247")
-        precondition(scanB.isHighConfidence && scanB.suggestedName == "B101")
+        precondition(scanA.isHighConfidence && scanA.suggestedName == "A001")
+        precondition(scanB.isHighConfidence && scanB.suggestedName == "A001")
         precondition(scanA.firstClipName != scanB.firstClipName)
         precondition(scanA.lastClipName != scanB.lastClipName)
 
@@ -34,19 +34,29 @@ struct DualCardIntegrationProbe {
             volumeUUID: uuidA,
             mediaUUID: mediaA,
             fileSystem: "ExFAT",
-            to: "A247"
+            to: "A001"
         )
-        precondition(resultA.success && resultA.actualName == "A247", resultA.message)
+        precondition(resultA.success && resultA.actualName == "A001", resultA.message)
 
-        let resultB = await RenamerEngine.renameVolumeAsync(
+        let conflictingResultB = await RenamerEngine.renameVolumeAsync(
             at: pathB,
             bsdNode: bsdB,
             volumeUUID: uuidB,
             mediaUUID: mediaB,
             fileSystem: "ExFAT",
-            to: "B101"
+            to: "A001"
         )
-        precondition(resultB.success && resultB.actualName == "B101", resultB.message)
+        precondition(!conflictingResultB.success, "A second mounted card must never be renamed to the already-mounted A001")
+
+        let resolvedResultB = await RenamerEngine.renameVolumeAsync(
+            at: pathB,
+            bsdNode: bsdB,
+            volumeUUID: uuidB,
+            mediaUUID: mediaB,
+            fileSystem: "ExFAT",
+            to: "A001_1"
+        )
+        precondition(resolvedResultB.success && resolvedResultB.actualName == "A001_1", resolvedResultB.message)
 
         print("DualCardIntegrationProbe: PASS")
     }

@@ -18,6 +18,8 @@ public struct RenamerPrinterAuditRecord: Codable {
     public let originalName: String
     public let actualName: String
     public let requestedName: String?
+    public let reuseCount: Int?
+    public let duplicateIndex: Int?
     public let volumeUUID: String?
     public let mediaUUID: String?
     public let bsdNode: String?
@@ -33,6 +35,8 @@ public struct RenamerPrinterAuditRecord: Codable {
         case originalName = "original_name"
         case actualName = "actual_name"
         case requestedName = "requested_name"
+        case reuseCount = "reuse_count"
+        case duplicateIndex = "duplicate_index"
         case volumeUUID = "volume_uuid"
         case mediaUUID = "media_uuid"
         case bsdNode = "bsd_node"
@@ -49,6 +53,8 @@ public struct RenamerPrinterAuditRecord: Codable {
         originalName = item.originalName
         actualName = item.newName
         requestedName = item.requestedName
+        reuseCount = item.reuseCount
+        duplicateIndex = item.duplicateIndex
         volumeUUID = item.volumeUUID
         mediaUUID = item.mediaUUID
         bsdNode = item.bsdNode

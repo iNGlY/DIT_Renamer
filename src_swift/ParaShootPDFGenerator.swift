@@ -125,6 +125,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
         let lSec2Title  = isCN ? "2. ParaShoot 擦卡与安全验证日志" : "2. ParaShoot Erase & Verification Log"
         
         // MARK: - Section 1: Rename Log Rows
+        let includesReuseCount = RenameAuditFormatting.includesReuseCount(renameItems)
         var renameRows = ""
         for item in renameItems {
             let first = htmlEscape(item.firstClipName ?? "-")
@@ -134,6 +135,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
                 <td>\(htmlEscape(item.formattedTime))</td>
                 <td><code style="background:#eef2ff; color:#3730a3;">\(htmlEscape(item.originalName))</code></td>
                 <td><strong style="color:#059669;">\(htmlEscape(item.newName))</strong></td>
+                \(RenameAuditFormatting.pdfReuseCellHTML(item: item, includeColumn: includesReuseCount))
                 <td style="font-family:monospace; font-size:10px;">\(first)</td>
                 <td style="font-family:monospace; font-size:10px;">\(last)</td>
                 <td style="text-align:center;">\(item.clipCount)</td>
@@ -154,6 +156,7 @@ class ParaShootPDFGenerator: NSObject, WKNavigationDelegate {
                         <th>\(lTime)</th>
                         <th>\(lOrigName)</th>
                         <th>\(lNewName)</th>
+                        \(RenameAuditFormatting.pdfReuseHeaderHTML(items: renameItems, isChinese: isCN))
                         <th>\(lFirstClip)</th>
                         <th>\(lLastClip)</th>
                         <th style="text-align:center;">\(lClips)</th>

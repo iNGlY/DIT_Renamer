@@ -44,8 +44,8 @@ seed_mount="$(plist_value "$seed_device" MountPoint)"
 [[ -n "$seed_mount" && "$seed_mount" == /Volumes/* ]] || { echo "Invalid seed mount point: $seed_mount" >&2; exit 1; }
 mkdir -p "$seed_mount/PRIVATE/M4ROOT/CLIP" "$seed_mount/PRIVATE/M4ROOT/GENERAL"
 printf '<ModelName>ILME-FX3</ModelName>\n' > "$seed_mount/PRIVATE/M4ROOT/GENERAL/M01.XML"
-printf 'fixture-a1\n' > "$seed_mount/PRIVATE/M4ROOT/CLIP/A247C001_260813AA.MP4"
-printf 'fixture-a2\n' > "$seed_mount/PRIVATE/M4ROOT/CLIP/A247C002_260813AA.MP4"
+printf 'fixture-a1\n' > "$seed_mount/PRIVATE/M4ROOT/CLIP/A001C001_260813AA.MP4"
+printf 'fixture-a2\n' > "$seed_mount/PRIVATE/M4ROOT/CLIP/A001C002_260813AA.MP4"
 hdiutil detach "$seed_device" >/dev/null
 ATTACHED_DEVICES=()
 cp "$BASE_IMAGE" "$CLONE_IMAGE"
@@ -72,8 +72,8 @@ name_b="$(plist_value "$device_b" VolumeName)"
 [[ "$name_a" == "Untitled" && "$name_b" == "Untitled" ]]
 
 find "$mount_b/PRIVATE/M4ROOT/CLIP" -type f -delete
-printf 'fixture-b1\n' > "$mount_b/PRIVATE/M4ROOT/CLIP/B101C001_260813BB.MP4"
-printf 'fixture-b2\n' > "$mount_b/PRIVATE/M4ROOT/CLIP/B101C002_260813BB.MP4"
+printf 'fixture-b1\n' > "$mount_b/PRIVATE/M4ROOT/CLIP/A001C101_260813BB.MP4"
+printf 'fixture-b2\n' > "$mount_b/PRIVATE/M4ROOT/CLIP/A001C102_260813BB.MP4"
 
 TEST_BUILD_DIR="$SIMULATION_DIR/build"
 mkdir -p "$TEST_BUILD_DIR"
@@ -88,8 +88,8 @@ swiftc -parse-as-library -target arm64-apple-macosx14.0 \
     "$mount_a" "${device_a#/dev/}" "$uuid_a" "${media_a:--}" \
     "$mount_b" "${device_b#/dev/}" "$uuid_b" "${media_b:--}"
 
-[[ "$(plist_value "$device_a" VolumeName)" == "A247" ]]
-[[ "$(plist_value "$device_b" VolumeName)" == "B101" ]]
+[[ "$(plist_value "$device_a" VolumeName)" == "A001" ]]
+[[ "$(plist_value "$device_b" VolumeName)" == "A001_1" ]]
 [[ "$(plist_value "$device_a" VolumeUUID)" == "$uuid_a" ]]
 [[ "$(plist_value "$device_b" VolumeUUID)" == "$uuid_b" ]]
 

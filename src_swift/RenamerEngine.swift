@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public final class RenamerEngine {
     public static func renameVolumeAsync(
@@ -61,6 +62,25 @@ public final class RenamerEngine {
                   before.volumeUUID == expectedVolumeUUID,
                   mediaUUID == nil || before.mediaUUID == mediaUUID else {
                 complete(completion, success: false, message: "重命名已取消：目标卷的挂载路径、BSD 节点或 UUID 已变化，可能已拔卡或被复用。")
+                return
+            }
+
+            switch volumeNameOccupancy(normalizedName, excludingBSDNode: bsdNode) {
+            case .available:
+                break
+            case .occupied:
+                complete(
+                    completion,
+                    success: false,
+                    message: "重命名已取消：另一张已挂载卡已经使用卷名 \(normalizedName)。请为当前卡使用不同卷号，例如增加 _1 冲突编号。"
+                )
+                return
+            case .unavailable:
+                complete(
+                    completion,
+                    success: false,
+                    message: "重命名已取消：无法完整读取当前挂载卷清单，因此不能安全确认卷名 \(normalizedName) 是否已被占用。请刷新后重试。"
+                )
                 return
             }
 
@@ -150,7 +170,7 @@ public final class RenamerEngine {
         let volumeName: String?
     }
 
-    private struct DiskUtilResult {
+    struct CommandResult {
         let status: Int32
         let standardOutput: String
         let standardError: String
@@ -164,54 +184,94 @@ public final class RenamerEngine {
 
     private enum DiskUtilError: LocalizedError {
         case timedOut([String])
+        case failedToTerminate([String])
 
         var errorDescription: String? {
             switch self {
             case .timedOut(let arguments):
                 return "diskutil \(arguments.joined(separator: " ")) 超过 20 秒未完成。"
+            case .failedToTerminate(let arguments):
+                return "diskutil \(arguments.joined(separator: " ")) 超时后仍无法确认进程已终止。"
             }
         }
     }
 
-    private static func runDiskUtil(arguments: [String], timeout: TimeInterval = 20) throws -> DiskUtilResult {
+    static func runCommand(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval
+    ) throws -> CommandResult {
         let process = Process()
         let output = Pipe()
         let error = Pipe()
         let completion = DispatchSemaphore(value: 0)
+        let readers = DispatchGroup()
+        let dataLock = NSLock()
+        var standardOutputData = Data()
+        var standardErrorData = Data()
 
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+        process.executableURL = executableURL
         process.arguments = arguments
         process.standardOutput = output
         process.standardError = error
         process.terminationHandler = { _ in completion.signal() }
+
         try process.run()
+
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            dataLock.lock()
+            standardOutputData = data
+            dataLock.unlock()
+            readers.leave()
+        }
+        readers.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let data = error.fileHandleForReading.readDataToEndOfFile()
+            dataLock.lock()
+            standardErrorData = data
+            dataLock.unlock()
+            readers.leave()
+        }
 
         guard completion.wait(timeout: .now() + timeout) == .success else {
             process.terminate()
-            _ = completion.wait(timeout: .now() + 1)
+            if completion.wait(timeout: .now() + 1) != .success {
+                Darwin.kill(process.processIdentifier, SIGKILL)
+                guard completion.wait(timeout: .now() + 2) == .success else {
+                    throw DiskUtilError.failedToTerminate(arguments)
+                }
+            }
+            readers.wait()
             throw DiskUtilError.timedOut(arguments)
         }
+        readers.wait()
 
-        return DiskUtilResult(
+        dataLock.lock()
+        let capturedOutput = standardOutputData
+        let capturedError = standardErrorData
+        dataLock.unlock()
+        return CommandResult(
             status: process.terminationStatus,
-            standardOutput: String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "",
-            standardError: String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            standardOutput: String(data: capturedOutput, encoding: .utf8) ?? "",
+            standardError: String(data: capturedError, encoding: .utf8) ?? ""
+        )
+    }
+
+    private static func runDiskUtil(arguments: [String], timeout: TimeInterval = 20) throws -> CommandResult {
+        try runCommand(
+            executableURL: URL(fileURLWithPath: "/usr/sbin/diskutil"),
+            arguments: arguments,
+            timeout: timeout
         )
     }
 
     private static func diskInfo(for target: String) -> DiskInfo? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        process.arguments = ["info", "-plist", target]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-
-        guard (try? process.run()) != nil else { return nil }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0,
+        guard let result = try? runDiskUtil(arguments: ["info", "-plist", target]),
+              result.status == 0,
               let plist = try? PropertyListSerialization.propertyList(
-                  from: output.fileHandleForReading.readDataToEndOfFile(), options: [], format: nil
+                  from: result.standardOutput.data(using: .utf8) ?? Data(), options: [], format: nil
               ) as? [String: Any],
               let deviceIdentifier = plist["DeviceIdentifier"] as? String else { return nil }
 
@@ -222,6 +282,75 @@ public final class RenamerEngine {
             mountPoint: plist["MountPoint"] as? String,
             volumeName: plist["VolumeName"] as? String
         )
+    }
+
+    private enum VolumeNameOccupancy {
+        case available
+        case occupied
+        case unavailable
+    }
+
+    private static func volumeNameOccupancy(
+        _ normalizedName: String,
+        excludingBSDNode: String
+    ) -> VolumeNameOccupancy {
+        guard let result = try? runDiskUtil(arguments: ["list", "-plist"]),
+              result.status == 0,
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: result.standardOutput.data(using: .utf8) ?? Data(),
+                  options: [],
+                  format: nil
+              ) else { return .unavailable }
+
+        guard let mountedVolumes = mountedVolumeInventory(from: plist),
+              !mountedVolumes.isEmpty else { return .unavailable }
+
+        let occupied = mountedVolumes.contains { volume in
+            volume.bsdNode != excludingBSDNode
+                && volume.name.precomposedStringWithCanonicalMapping.uppercased() == normalizedName
+        }
+        return occupied ? .occupied : .available
+    }
+
+    struct MountedVolumeInventoryItem: Equatable {
+        let bsdNode: String
+        let name: String
+    }
+
+    static func mountedVolumeInventory(from value: Any) -> [MountedVolumeInventoryItem]? {
+        var result: [MountedVolumeInventoryItem] = []
+        guard collectMountedVolumes(from: value, into: &result) else { return nil }
+        return result
+    }
+
+    private static func collectMountedVolumes(
+        from value: Any,
+        into result: inout [MountedVolumeInventoryItem]
+    ) -> Bool {
+        if let dictionary = value as? [String: Any] {
+            if dictionary.keys.contains("MountPoint") {
+                guard let mountPoint = dictionary["MountPoint"] as? String,
+                      !mountPoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let bsdNode = dictionary["DeviceIdentifier"] as? String,
+                      !bsdNode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let name = dictionary["VolumeName"] as? String,
+                      !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    return false
+                }
+                result.append(MountedVolumeInventoryItem(
+                    bsdNode: bsdNode.trimmingCharacters(in: .whitespacesAndNewlines),
+                    name: name.trimmingCharacters(in: .whitespacesAndNewlines)
+                ))
+            }
+            for nested in dictionary.values {
+                guard collectMountedVolumes(from: nested, into: &result) else { return false }
+            }
+        } else if let array = value as? [Any] {
+            for nested in array {
+                guard collectMountedVolumes(from: nested, into: &result) else { return false }
+            }
+        }
+        return true
     }
 
     private static func waitForRemountedDisk(

@@ -17,6 +17,8 @@
 - 增加中英双语、无需命令行的安装与故障排除教程，明确 macOS 14、无需额外运行库、可选 exiftool、权限与 Gatekeeper 图形界面处理流程。
 - 增加挂载会话与扫描 generation 身份，快速换卡或取消重扫时旧结果不会进入新卡待办；拔卡候选立即失效。
 - Media UUID 缺失时，执行前再次核对首末素材；重挂载最终复核允许最多 5 秒的系统登记延迟。
+- 两张已挂载卡即使素材不同，只要建议或手动目标卷名相同，就同时停止自动和批量执行并要求人工加入 `_1`、`_2` 等冲突编号或分配其他卷号；自动队列首张执行前及连续两张之间增加 1 秒稳定窗口，并在每次执行前重新核对全部候选。
+- 手动工作区增加“机位号重复”开关，自动生成当前可用的 `_1`、`_2` 等冲突编号；卡片复用次数改为默认关闭的可选审计/标签元数据，不再改变实际卷名，关闭时 PDF、CSV 与 Printer 只读接口均不输出该字段。
 
 ### English
 
@@ -33,6 +35,8 @@
 - Added a bilingual, Terminal-free installation and troubleshooting guide covering macOS 14, bundled dependencies, optional exiftool, permissions, and Apple's GUI Gatekeeper flow.
 - Added mount-session and scan-generation identities so stale scan results cannot attach to a replacement card; candidates become stale as soon as their mount session disappears.
 - When Media UUID is unavailable, the app rechecks first/last clip identity before execution. Final remount verification now tolerates up to five seconds of macOS registration delay.
+- If two mounted cards resolve to the same suggested or manually requested volume name, automatic and batch execution stop for both cards until the operator appends `_1`, `_2`, and so on or assigns another roll. The queue now includes a one-second stabilization window before the first rename and between consecutive cards, followed by a fresh all-candidate safety check before every operation.
+- Added a Duplicate Camera ID switch that assigns the next available `_1`, `_2`, and so on. Card reuse count is now optional audit/label metadata, disabled by default, never changes the real volume name, and is omitted from PDF, CSV, and the Printer read-only interface when disabled.
 
 ## 1.1.1 — 2026-08-10
 
