@@ -21,6 +21,7 @@ DIT Renamer 1.2.0 是后台优先的正式版本，主要操作可直接在菜�
 - 自动重命名改为严格串行队列。两张卡同时完成扫描时会逐张执行，不再因第一张处于重挂载流程而遗漏第二张。
 - UUID 相同但首末素材不同的卡允许分别自动处理；UUID 和首末素材完全相同的疑似克隆卡会禁止自动及批量批准。
 - 默认后台运行，加入本地通知、卡片忽略/恢复、菜单栏规则切换，以及 720/900/1180 逻辑点响应式主窗口。
+- 增加不依赖命令行的中英双语安装与故障排除指南，说明 macOS 14 最低版本、无需额外运行库、可选 exiftool、可移动卷宗权限、未知开发者和损坏提示的安全处理方式。
 - DIT Printer 仍为独立项目，Renamer 只保留只读审计数据接口。
 
 分发说明：
@@ -54,6 +55,7 @@ Included in this release:
 - Automatic renames now use a strictly sequential queue, so a second card is not skipped while the first card is being remounted.
 - Cards sharing a UUID remain auto-eligible when first/last clips differ. Exact UUID and clip-identity duplicates require operator review and cannot be batch-approved.
 - Added background-first operation, local notifications, ignore/restore controls, menu-bar rule switches, and responsive 720/900/1180-point main-window layouts.
+- Added a bilingual GUI-only installation and troubleshooting guide covering the macOS 14 minimum, bundled runtime requirements, optional exiftool, removable-volume permissions, unidentified-developer warnings, and damaged-download recovery.
 - DIT Printer remains a separate project. Renamer keeps only its read-only audit-data interface.
 
 Distribution notes:

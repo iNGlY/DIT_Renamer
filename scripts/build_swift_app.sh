@@ -252,11 +252,19 @@ else
 DIT Renamer $VERSION $DMG_INSTRUCTIONS_LABEL
 
 此构建未使用 Apple Developer ID 签名，也没有经过 Apple notarization。
-macOS Gatekeeper 可能阻止从 GitHub 下载的应用直接启动，因此本包不能视为“即开即用”的正式分发版本。
+最低系统要求：macOS 14。支持 Apple Silicon 与 Intel，不需要 Rosetta、Swift、Python、Java、Homebrew 或其它运行库。
+exiftool 仅用于 Sony 元数据缺失时补充型号识别，不安装也可使用全部核心重命名功能。
 
 安装：
 1. 将 DIT Renamer.app 拖入 Applications。
-2. 首次启动若被阻止，请在“系统设置 > 隐私与安全性”中核对应用来源并选择“仍要打开”。
+2. 在 Finder > 应用程序中按住 Control 点按 DIT Renamer，选择“打开”。
+3. 若仍被阻止，先尝试打开一次，再前往“系统设置 > 隐私与安全性”，选择“仍要打开”。
+4. 如果提示 App 已损坏，请删除 App 和 DMG，并从 GitHub Latest Release 重新下载完整 DMG。
+5. 软件默认驻留菜单栏；启动后请查看屏幕右上角的存储卡图标。
+
+English:
+Requires macOS 14 or later. Native Apple Silicon and Intel support; no Rosetta or external runtime is required. exiftool is optional.
+Drag the App to Applications, then Control-click it in Finder and choose Open. If blocked, use System Settings > Privacy & Security > Open Anyway. If the App is reported as damaged, delete it and download a fresh DMG from the official GitHub Latest Release.
 
 本发布包不包含 sudo、xattr、隔离属性清除脚本或其他自动绕过 Gatekeeper 的工具。
 EOF

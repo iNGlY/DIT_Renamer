@@ -4,12 +4,24 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 
 **[下载最新版本](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
+## 运行环境
+
+- macOS 14 Sonoma 或更高版本。macOS 13 及更早版本不受支持。
+- Apple Silicon 与 Intel Mac 均可直接运行，不需要 Rosetta。
+- 不需要安装 Swift、Python、Java、Homebrew 或其它运行库；更新组件已经包含在 App 内，卷管理使用 macOS 自带工具。
+- `exiftool` 是可选组件。Sony 卡缺少可读取的 XML/XMP 时，它可以补充机型识别；未安装不会影响卡片扫描、卷名审批、重命名或重挂载。
+- 需要对摄影机卡具有读写权限。macOS 首次询问“可移动卷宗”访问权限时请选择“允许”；通知权限可选。
+
 ## 首次安装
 
 1. 从 [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest) 下载 DMG。需要核对下载时，可使用同一发布页中的 `SHA256SUMS.txt`。
 2. 打开 DMG，将 `DIT Renamer.app` 拖到旁边的 `Applications` 快捷方式。
-3. 从 `/Applications/DIT Renamer.app` 启动。当前发布包没有 Developer ID 签名和 Apple 公证，macOS 可能在首次启动时阻止打开。此时前往“系统设置 > 隐私与安全性”，找到 DIT Renamer 并选择“仍要打开”。
-4. 后续版本可由应用内更新直接替换。更新完成后只需重新启动，不必再次拖拽 App。
+3. 打开 Finder 的“应用程序”，按住 Control 点按 `DIT Renamer.app`，选择“打开”，再确认一次“打开”。
+4. 如果 macOS 仍提示未知开发者或阻止启动：先尝试打开一次，然后进入“系统设置 > 隐私与安全性”，在页面下方找到 DIT Renamer，点“仍要打开”，使用 Touch ID 或登录密码确认。
+5. 如果提示“App 已损坏”：将 App 移到废纸篓，重新从本仓库的 Latest Release 下载完整 DMG，并重新拖入“应用程序”。不要使用第三方网盘转存包。若“隐私与安全性”仍提供“仍要打开”，可使用该 Apple 系统入口；本项目不会要求运行终端命令来绕过安全检查。
+6. 后续版本可由应用内更新直接替换。更新完成后只需重新启动，不必再次拖拽 App。
+
+图形界面的完整安装、权限和故障排除步骤见 [安装与运行指南](docs/installation_guide.md)。
 
 当前发布包是 universal ad-hoc 构建，支持 Apple Silicon 和 Intel Mac。项目不提供 `sudo xattr`、清除隔离属性或绕过 Gatekeeper 的脚本。
 
@@ -60,12 +72,24 @@ DIT Renamer is a background-first native macOS utility that helps DITs identify 
 
 **[Download the latest release](https://github.com/iNGlY/DIT_Renamer/releases/latest)**
 
+## Requirements
+
+- macOS 14 Sonoma or later. macOS 13 and earlier are not supported.
+- Native support for Apple Silicon and Intel Macs; Rosetta is not required.
+- No Swift, Python, Java, Homebrew, or other runtime installation is required. Sparkle is embedded and volume operations use macOS components.
+- `exiftool` is optional. It can provide a Sony model when readable XML/XMP metadata is absent; scanning, review, rename, and remount continue to work without it.
+- Read/write access to camera media is required. Choose **Allow** if macOS asks for access to removable volumes. Notifications are optional.
+
 ## First installation
 
 1. Download the DMG from [Latest Release](https://github.com/iNGlY/DIT_Renamer/releases/latest). Use `SHA256SUMS.txt` from the same page if you need to verify the download.
 2. Open the DMG and drag `DIT Renamer.app` onto the `Applications` shortcut.
-3. Launch `/Applications/DIT Renamer.app`. This release is not signed with Developer ID or notarized by Apple, so macOS may block the first launch. Open **System Settings > Privacy & Security**, find DIT Renamer, and choose **Open Anyway**.
-4. Later releases can update the installed app in place. When an update finishes, restart the app; no further drag-and-drop installation is required.
+3. Open Finder > Applications, Control-click `DIT Renamer.app`, choose **Open**, then confirm **Open** again.
+4. If macOS still reports an unidentified developer or blocks launch, make one launch attempt, open **System Settings > Privacy & Security**, find DIT Renamer near the bottom, select **Open Anyway**, and authenticate with Touch ID or your login password.
+5. If macOS says the App is damaged, move it to the Trash, download the complete DMG again from this repository's Latest Release, and drag a fresh copy into Applications. Do not use a repackaged copy from a third-party file host. If **Open Anyway** is available in Privacy & Security, that Apple-provided control may be used; this project never asks users to run Terminal commands to bypass security checks.
+6. Later releases can update the installed app in place. When an update finishes, restart the app; no further drag-and-drop installation is required.
+
+See the [Installation and Troubleshooting Guide](docs/installation_guide.md) for complete GUI-only setup, permissions, and recovery steps.
 
 The current package is a universal ad-hoc build for Apple Silicon and Intel Macs. This project does not provide `sudo xattr`, quarantine-removal, or Gatekeeper-bypass scripts.
 
