@@ -5,6 +5,7 @@ struct MainDetailView: View {
     @Binding var volume: MountedVolume?
     @ObservedObject var monitor: VolumeMonitor
     @Binding var isAutoRenameEnabled: Bool
+    var compactLayout: Bool = false
     @ObservedObject private var approvalCoordinator = RenameApprovalCoordinator.shared
     
     @State private var scanResult: ScanResult? = nil
@@ -136,6 +137,9 @@ struct MainDetailView: View {
                                 Spacer()
                                 Text("/dev/\(vol.bsdNode) -> \(vol.path)")
                                     .font(.system(.body, design: .monospaced))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .textSelection(.enabled)
                             }
                             Divider()
                             HStack {
@@ -177,34 +181,16 @@ struct MainDetailView: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                         
                         // Read-only scan summary
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "sparkles")
-                                        .foregroundColor(.blue)
-                                    Text("\(langManager.text("素材结构分析", "Media Structure")) (\(scanResult?.deviceType ?? "Generic"))")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.blue)
-                                }
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("\(langManager.text("首条素材", "First Clip")): \(scanResult?.firstClipName ?? langManager.text("搜索中...", "Searching..."))")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                    Text("\(langManager.text("末条素材", "Last Clip")): \(scanResult?.lastClipName ?? langManager.text("搜索中...", "Searching..."))")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                }
+                        ViewThatFits(in: .horizontal) {
+                            HStack {
+                                scanSummaryDetails
+                                Spacer()
+                                scanSummarySuggestion
                             }
-                            Spacer()
-                            Text(scanResult?.suggestedName ?? langManager.text("待人工确认", "Manual confirmation required"))
-                                .font(.system(.title3, design: .monospaced))
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color.blue.opacity(0.15))
-                                .cornerRadius(8)
+                            VStack(alignment: .leading, spacing: 8) {
+                                scanSummaryDetails
+                                scanSummarySuggestion
+                            }
                         }
                         .padding(12)
                         .background(Color.blue.opacity(0.05))
@@ -223,13 +209,16 @@ struct MainDetailView: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
                             
-                            HStack(alignment: .top, spacing: 16) {
+                            let controlLayout = compactLayout
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                                : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
+                            controlLayout {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(langManager.text("机位标识 (CAMERA ID)", "CAMERA ID"))
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                     
-                                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 13), spacing: 4) {
+                                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: compactLayout ? 7 : 13), spacing: 4) {
                                         ForEach(letters, id: \.self) { char in
                                             Text(char)
                                                 .font(.caption2)
@@ -264,6 +253,7 @@ struct MainDetailView: View {
                                             .font(.system(.body, design: .monospaced))
                                     }
                                 }
+                                .frame(minWidth: compactLayout ? nil : 150)
                             }
 
                             if let suffix = scanResult?.suffix {
@@ -297,17 +287,21 @@ struct MainDetailView: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.secondary)
                             
-                            HStack(spacing: 12) {
-                                Text(vol.name)
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                Image(systemName: "arrow.right")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                Text(previewNewName)
-                                    .font(.system(.title3, design: .monospaced))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 12) {
+                                    previewOldName(vol)
+                                    Image(systemName: "arrow.right")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    previewNewNameLabel
+                                }
+                                VStack(spacing: 4) {
+                                    previewOldName(vol)
+                                    Image(systemName: "arrow.down")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    previewNewNameLabel
+                                }
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -379,6 +373,55 @@ struct MainDetailView: View {
                 )
             }
         }
+    }
+
+    private var scanSummaryDetails: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.blue)
+                Text("\(langManager.text("素材结构分析", "Media Structure")) (\(scanResult?.deviceType ?? "Generic"))")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue)
+            }
+            Text("\(langManager.text("首条素材", "First Clip")): \(scanResult?.firstClipName ?? langManager.text("搜索中...", "Searching..."))")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text("\(langManager.text("末条素材", "Last Clip")): \(scanResult?.lastClipName ?? langManager.text("搜索中...", "Searching..."))")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+    }
+
+    private var scanSummarySuggestion: some View {
+        Text(scanResult?.suggestedName ?? langManager.text("待人工确认", "Manual confirmation required"))
+            .font(.system(.title3, design: .monospaced))
+            .fontWeight(.bold)
+            .foregroundColor(.blue)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.blue.opacity(0.15))
+            .cornerRadius(8)
+    }
+
+    private func previewOldName(_ volume: MountedVolume) -> some View {
+        Text(volume.name)
+            .font(.system(.body, design: .monospaced))
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+    }
+
+    private var previewNewNameLabel: some View {
+        Text(previewNewName)
+            .font(.system(.title3, design: .monospaced))
+            .fontWeight(.bold)
+            .foregroundColor(.green)
+            .lineLimit(1)
     }
     
     private func executeRename() {

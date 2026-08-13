@@ -8,23 +8,14 @@ struct SidebarView: View {
     @ObservedObject var langManager = LanguageManager.shared
     @State private var sidebarTab: Int = 0
     @State private var knownVolumeIDs: Set<String> = []
-    @AppStorage("ignoredVolumePaths") private var ignoredPathsData: Data = Data()
-    
-    var ignoredPaths: Set<String> {
-        get {
-            (try? JSONDecoder().decode(Set<String>.self, from: ignoredPathsData)) ?? []
-        }
-        set {
-            ignoredPathsData = (try? JSONEncoder().encode(newValue)) ?? Data()
-        }
-    }
+    @ObservedObject private var ignoredStore = IgnoredVolumeStore.shared
     
     var activeVolumes: [MountedVolume] {
-        monitor.volumes.filter { !ignoredPaths.contains($0.path) }
+        monitor.volumes.filter { !ignoredStore.paths.contains($0.path) }
     }
     
     var ignoredVolumes: [MountedVolume] {
-        monitor.volumes.filter { ignoredPaths.contains($0.path) }
+        monitor.volumes.filter { ignoredStore.paths.contains($0.path) }
     }
 
     var recommendedVolumes: [MountedVolume] {
@@ -165,7 +156,7 @@ struct SidebarView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
         }
-        .frame(width: 260)
+        .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
         .onAppear {
             knownVolumeIDs = Set(activeVolumes.map(\.id))
@@ -174,7 +165,7 @@ struct SidebarView: View {
             }
         }
         .onChange(of: monitor.volumes) { _, newVolumes in
-            let active = newVolumes.filter { !ignoredPaths.contains($0.path) }
+            let active = newVolumes.filter { !ignoredStore.paths.contains($0.path) }
             let newIDs = Set(active.map(\.id))
             let inserted = active.first { !knownVolumeIDs.contains($0.id) }
             knownVolumeIDs = newIDs
@@ -285,17 +276,9 @@ struct SidebarView: View {
     }
     
     private func toggleIgnore(vol: MountedVolume, isIgnored: Bool) {
-        var set = (try? JSONDecoder().decode(Set<String>.self, from: ignoredPathsData)) ?? []
-        if isIgnored {
-            set.remove(vol.path)
-        } else {
-            set.insert(vol.path)
-            if selectedVolume?.id == vol.id {
-                selectedVolume = nil
-            }
-        }
-        if let encoded = try? JSONEncoder().encode(set) {
-            ignoredPathsData = encoded
+        ignoredStore.setIgnored(!isIgnored, volume: vol)
+        if !isIgnored, selectedVolume?.id == vol.id {
+            selectedVolume = nil
         }
     }
 }

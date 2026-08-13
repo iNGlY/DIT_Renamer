@@ -26,9 +26,10 @@ struct VisualEffectView: NSViewRepresentable {
 @main
 struct DITRenamerApp: App {
     @Environment(\.openWindow) private var openWindow
-    @StateObject private var volumeMonitor = VolumeMonitor()
+    @StateObject private var runtime: AppRuntime
     @StateObject private var approvalCoordinator = RenameApprovalCoordinator.shared
     @StateObject private var updateController = UpdateController.shared
+    @StateObject private var attentionCenter = OperatorAttentionCenter.shared
     @ObservedObject private var langManager = LanguageManager.shared
     
     @State private var selectedVolume: MountedVolume? = nil
@@ -38,57 +39,36 @@ struct DITRenamerApp: App {
     @State private var showParaShootSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
 
+    init() {
+        let runtime = AppRuntime()
+        _runtime = StateObject(wrappedValue: runtime)
+    }
+
     var body: some Scene {
-        WindowGroup(id: "main") {
+        Window("DIT Renamer", id: "main") {
             ZStack {
                 // Global Full-Window Glassmorphic Material
                 VisualEffectView(material: .fullScreenUI, blendingMode: .behindWindow)
                     .ignoresSafeArea()
                 
-                HStack(spacing: 0) {
-                    // Left Sidebar (Frosted Glass)
-                    SidebarView(
-                        monitor: volumeMonitor,
-                        selectedVolume: $selectedVolume,
-                        isAutoRenameEnabled: $isAutoRenameEnabled,
-                        onShowAbout: { showAboutSheet = true },
-                        onShowSettings: { showSettingsSheet = true }
-                    )
-                    
-                    Divider()
-                    
-                    // Main Workspace (Responsive Glass)
-                    MainDetailView(
-                        volume: $selectedVolume,
-                        monitor: volumeMonitor,
-                        isAutoRenameEnabled: $isAutoRenameEnabled
-                    )
-                    
-                    Divider()
-                    
-                    // Permanent Fixed Right Audit Inspector Sidebar
-                    RightInspectorView(selectedTab: $selectedAuditTab)
-                }
+                ResponsiveWorkspaceView(
+                    monitor: runtime.volumeMonitor,
+                    ignoredVolumes: runtime.ignoredVolumes,
+                    selectedVolume: $selectedVolume,
+                    isAutoRenameEnabled: $isAutoRenameEnabled,
+                    selectedAuditTab: $selectedAuditTab,
+                    onShowSettings: { showSettingsSheet = true },
+                    onShowAbout: { showAboutSheet = true }
+                )
             }
-            .frame(minWidth: 1180, idealWidth: 1180, minHeight: 680, idealHeight: 680)
+            .background(MainWindowAccessor())
+            .frame(minWidth: 720, idealWidth: 1180, minHeight: 520, idealHeight: 680)
             .preferredColorScheme(.dark)
             .onAppear {
                 LegacyAppMigrator.shared.migrateIfNeeded()
-                approvalCoordinator.refresh(volumes: volumeMonitor.volumes)
-            }
-            .onChange(of: volumeMonitor.volumes) { _, newVolumes in
-                approvalCoordinator.refresh(volumes: newVolumes)
-            }
-            .alert(item: $updateController.startupNotice) { notice in
-                Alert(
-                    title: Text(notice.title),
-                    message: Text(notice.message),
-                    dismissButton: .default(Text(notice.actionTitle ?? langManager.text("知道了", "OK"))) {
-                        if let actionURL = notice.actionURL {
-                            NSWorkspace.shared.open(actionURL)
-                        }
-                    }
-                )
+                MainWindowCoordinator.shared.configure {
+                    openWindow(id: "main")
+                }
             }
             .sheet(isPresented: $showAboutSheet) {
                 AboutView()
@@ -97,7 +77,7 @@ struct DITRenamerApp: App {
                 ParaShootAuditView()
             }
             .sheet(isPresented: $showSettingsSheet) {
-                SettingsView(monitor: volumeMonitor)
+                SettingsView(monitor: runtime.volumeMonitor)
             }
         }
         .windowStyle(.hiddenTitleBar)
@@ -119,7 +99,16 @@ struct DITRenamerApp: App {
         MenuBarExtra {
             RenameMenuBarView(
                 coordinator: approvalCoordinator,
-                monitor: volumeMonitor,
+                runtime: runtime,
+                attentionCenter: attentionCenter,
+                onShowSettings: {
+                    openMainWindow()
+                    DispatchQueue.main.async { showSettingsSheet = true }
+                },
+                onShowAbout: {
+                    openMainWindow()
+                    DispatchQueue.main.async { showAboutSheet = true }
+                },
                 openMainWindow: {
                     openMainWindow()
                 }
@@ -147,10 +136,6 @@ struct DITRenamerApp: App {
     }
 
     private func openMainWindow() {
-        NSApp.activate(ignoringOtherApps: true)
-        openWindow(id: "main")
-        if let window = NSApp.windows.first(where: { $0.isVisible }) {
-            window.makeKeyAndOrderFront(nil)
-        }
+        MainWindowCoordinator.shared.show()
     }
 }

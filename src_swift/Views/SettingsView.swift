@@ -12,6 +12,9 @@ struct SettingsView: View {
     @AppStorage("excludeUDF")      private var excludeUDF:     Bool = true  // ARRI Alexa/Amira, Sony Venice
     @AppStorage("excludeHDECodex") private var excludeCodex:   Bool = true  // Codex HDE X2X FUSE
     @AppStorage("enableExifToolModelDetection") private var enableExifToolModelDetection: Bool = true
+    @AppStorage("notificationsEnabled") private var notificationsEnabled: Bool = true
+    @AppStorage("showMainWindowForReview") private var showMainWindowForReview: Bool = false
+    @AppStorage("startInBackground") private var startInBackground: Bool = true
     
     // 卷名黑名单
     @AppStorage("customIgnores") private var customIgnoresData: Data = Data()
@@ -43,6 +46,43 @@ struct SettingsView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+
+                // MARK: - Background operation and attention
+                sectionCard {
+                    sectionHeader(
+                        icon: "menubar.rectangle",
+                        title: langManager.text("后台运行与提醒", "Background Operation & Alerts"),
+                        subtitle: langManager.text(
+                            "DIT Renamer 默认驻留菜单栏。主窗口关闭后仍会继续检测存储卡和维护审批队列。",
+                            "DIT Renamer normally lives in the menu bar. Closing the main window does not stop card monitoring or the review queue."
+                        )
+                    )
+
+                    VStack(spacing: 0) {
+                        toggleRow(
+                            label: langManager.text("启动时隐藏主窗口", "Hide main window at launch"),
+                            detail: langManager.text("启动后只显示菜单栏图标，需要时再打开主窗口。", "Launch with only the menu bar item visible and open the main window on demand."),
+                            binding: $startInBackground,
+                            onChange: {}
+                        )
+                        Divider().padding(.horizontal, 12)
+                        toggleRow(
+                            label: langManager.text("需要人工确认时发送通知", "Notify when manual review is required"),
+                            detail: langManager.text("通知只负责提醒，不能直接执行重命名。", "Notifications only draw attention and can never execute a rename."),
+                            binding: $notificationsEnabled,
+                            onChange: { OperatorAttentionCenter.shared.refreshAuthorizationStatus() }
+                        )
+                        Divider().padding(.horizontal, 12)
+                        toggleRow(
+                            label: langManager.text("需要确认时自动显示主窗口", "Show main window when review is required"),
+                            detail: langManager.text("关闭时保持后台运行，仅依靠菜单栏数量和系统通知。", "When disabled, the app stays in the background and relies on the menu-bar count and notifications."),
+                            binding: $showMainWindowForReview,
+                            onChange: {}
+                        )
+                    }
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(8)
+                }
                 
                 // MARK: - 1. 规则化命名摄影机排除
                 sectionCard {
@@ -198,7 +238,7 @@ struct SettingsView: View {
             }
             .padding(.bottom, 24)
         }
-        .frame(width: 520, height: 600)
+        .frame(minWidth: 440, idealWidth: 520, maxWidth: 620, minHeight: 460, idealHeight: 600, maxHeight: 760)
     }
     
     // MARK: - Helpers

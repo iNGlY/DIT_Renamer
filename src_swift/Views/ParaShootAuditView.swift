@@ -121,7 +121,7 @@ struct ParaShootAuditView: View {
                 }
             }
         }
-        .frame(width: 480, height: 420)
+        .frame(minWidth: 420, idealWidth: 480, maxWidth: 640, minHeight: 360, idealHeight: 420, maxHeight: 700)
         .onAppear {
             parashootParser.reloadLogs()
         }

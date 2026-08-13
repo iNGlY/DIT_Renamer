@@ -26,7 +26,7 @@ struct AboutView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 12)
         }
-        .frame(width: 600, height: 680)
+        .frame(minWidth: 480, idealWidth: 600, maxWidth: 700, minHeight: 500, idealHeight: 680, maxHeight: 800)
         .preferredColorScheme(.dark)
     }
 

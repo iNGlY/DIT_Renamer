@@ -104,7 +104,7 @@ struct RightInspectorView: View {
                 parashootHistorySection
             }
         }
-        .frame(width: 290)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
         .onAppear {
             historyStore.loadHistory()

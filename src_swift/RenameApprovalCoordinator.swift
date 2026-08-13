@@ -12,6 +12,7 @@ final class RenameApprovalCoordinator: ObservableObject {
     private let store = RenameApprovalStore.shared
     private var scanTasks: [String: Task<Void, Never>] = [:]
     private var scannedVolumeKeys = Set<String>()
+    private var excludedMountPaths = Set<String>()
 
     private init() {
         pendingCandidates = store.candidates
@@ -36,9 +37,28 @@ final class RenameApprovalCoordinator: ObservableObject {
         isScanning = !scanTasks.isEmpty
     }
 
+    func rescan(volumes: [MountedVolume]) {
+        for task in scanTasks.values { task.cancel() }
+        scanTasks.removeAll()
+        scannedVolumeKeys.removeAll()
+        refresh(volumes: volumes)
+    }
+
+    func setExcludedMountPaths(_ paths: Set<String>) {
+        excludedMountPaths = paths
+        for candidate in pendingCandidates where paths.contains(candidate.mountPath) {
+            store.remove(id: candidate.id)
+        }
+        scannedVolumeKeys = scannedVolumeKeys.filter { key in
+            !paths.contains { key.contains("|\($0)|") }
+        }
+        syncFromStore()
+    }
+
     func ingest(volume: MountedVolume, scan: ScanResult, requestedName: String? = nil) -> RenameCandidate? {
         guard scan.isScanComplete, volume.volumeUUID != nil else { return nil }
         guard !scan.isEmptyCard, !scan.isPhotoOnly, !scan.isUnformattedCard else { return nil }
+        guard !volume.isUniqueCameraName || requestedName != nil else { return nil }
         let candidate = RenameCandidate(volume: volume, scan: scan, requestedName: requestedName)
         guard candidate.effectiveName != nil || !volume.isUniqueCameraName else { return nil }
         store.upsert(candidate)
@@ -113,9 +133,13 @@ final class RenameApprovalCoordinator: ObservableObject {
 
     private func accept(scan: ScanResult, volume: MountedVolume) async {
         scanTasks[volume.id] = nil
+        guard !excludedMountPaths.contains(volume.path) else {
+            isScanning = !scanTasks.isEmpty
+            return
+        }
         if scan.isScanComplete, let candidate = ingest(volume: volume, scan: scan) {
             let automatic = UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled")
-            if automatic && candidate.canBeBatchApproved {
+            if automatic && volume.isGenericName && candidate.canBeBatchApproved {
                 _ = await approveSuggestedName(candidateID: candidate.id)
             }
         }

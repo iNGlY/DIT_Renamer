@@ -157,6 +157,8 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
     <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>SUFeedURL</key>
