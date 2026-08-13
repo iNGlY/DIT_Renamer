@@ -379,13 +379,15 @@ struct RenameMenuBarView: View {
                     Task { notice = await coordinator.approveSuggestedName(candidateID: candidate.id).message }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(candidate.effectiveName == nil || candidate.state == .approving || MediaOperationCoordinator.shared.isBusy)
+                .disabled(candidate.effectiveName == nil || candidate.state == .approving || candidate.state == .stale || MediaOperationCoordinator.shared.isBusy)
 
                 Button(langManager.text("手动指派", "Assign")) { prepareAssignment(candidate) }
                     .buttonStyle(.bordered)
+                    .disabled(candidate.state == .stale)
 
                 Button(langManager.text("重扫", "Rescan")) { coordinator.rescan(candidateID: candidate.id) }
                     .buttonStyle(.borderless)
+                    .disabled(candidate.state == .stale)
 
                 Button(langManager.text("暂不处理", "Dismiss")) { coordinator.dismiss(candidateID: candidate.id) }
                     .buttonStyle(.borderless)
@@ -450,7 +452,7 @@ struct RenameMenuBarView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(preview == nil || MediaOperationCoordinator.shared.isBusy)
+            .disabled(preview == nil || candidate.state == .stale || MediaOperationCoordinator.shared.isBusy)
         }
         .padding(10)
         .background(Color.blue.opacity(0.08))

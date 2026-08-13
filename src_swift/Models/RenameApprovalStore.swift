@@ -43,6 +43,20 @@ public final class RenameApprovalStore: ObservableObject {
         persist()
     }
 
+    public func markStale(excludingMountedSessionIDs mountedSessionIDs: Set<String>) {
+        var changed = false
+        for index in candidates.indices {
+            guard candidates[index].state != .approving,
+                  candidates[index].state != .stale else { continue }
+            let sessionID = candidates[index].mountSessionID
+            guard sessionID == nil || !mountedSessionIDs.contains(sessionID!) else { continue }
+            candidates[index].state = .stale
+            candidates[index].lastError = "存储卡已卸载或挂载会话已变化，请重新插卡并扫描。"
+            changed = true
+        }
+        if changed { persist() }
+    }
+
     public func remove(id: UUID) {
         candidates.removeAll { $0.id == id }
         persist()

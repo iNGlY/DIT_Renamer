@@ -2,11 +2,14 @@ import Foundation
 import AppKit
 import Combine
 
+@MainActor
 public class VolumeMonitor: ObservableObject {
     @Published public var volumes: [MountedVolume] = []
     
     private var cancellables = Set<AnyCancellable>()
     private var refreshGeneration = 0
+    private var refreshWorkItem: DispatchWorkItem?
+    private var mountSessionIDsByPath: [String: String] = [:]
     
     public init() {
         setupSubscriptions()
@@ -17,12 +20,34 @@ public class VolumeMonitor: ObservableObject {
         let center = NSWorkspace.shared.notificationCenter
         
         center.publisher(for: NSWorkspace.didMountNotification)
-            .sink { [weak self] _ in self?.refreshVolumes() }
+            .sink { [weak self] notification in
+                self?.recordMountEvent(notification, isMounted: true)
+            }
             .store(in: &cancellables)
             
         center.publisher(for: NSWorkspace.didUnmountNotification)
-            .sink { [weak self] _ in self?.refreshVolumes() }
+            .sink { [weak self] notification in
+                self?.recordMountEvent(notification, isMounted: false)
+            }
             .store(in: &cancellables)
+    }
+
+    private func recordMountEvent(_ notification: Notification, isMounted: Bool) {
+        if let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL {
+            if isMounted {
+                mountSessionIDsByPath[url.path] = UUID().uuidString
+            } else {
+                mountSessionIDsByPath.removeValue(forKey: url.path)
+            }
+        }
+        scheduleRefresh()
+    }
+
+    private func scheduleRefresh() {
+        refreshWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.refreshVolumes() }
+        refreshWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
     }
     
     public func refreshVolumes() {
@@ -43,7 +68,7 @@ public class VolumeMonitor: ObservableObject {
             let resourceKeys = Set(keys)
             guard let urls = fm.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else { return }
             
-            var list: [MountedVolume] = []
+            var discovered: [(MountedVolume, String)] = []
             
             for url in urls {
                 let path = url.path
@@ -118,17 +143,37 @@ public class VolumeMonitor: ObservableObject {
                     isGenericName: isGeneric,
                     fileSystem: fsType
                 )
-                list.append(vol)
+                discovered.append((vol, path))
             }
             
             DispatchQueue.main.async {
                 guard generation == self.refreshGeneration else { return }
-                self.volumes = list
+                let activePaths = Set(discovered.map(\.1))
+                self.mountSessionIDsByPath = self.mountSessionIDsByPath.filter { activePaths.contains($0.key) }
+                self.volumes = discovered.map { volume, path in
+                    let sessionID = self.mountSessionIDsByPath[path] ?? UUID().uuidString
+                    self.mountSessionIDsByPath[path] = sessionID
+                    return MountedVolume(
+                        name: volume.name,
+                        originalName: volume.originalName,
+                        path: volume.path,
+                        bsdNode: volume.bsdNode,
+                        volumeUUID: volume.volumeUUID,
+                        mediaUUID: volume.mediaUUID,
+                        mountSessionID: sessionID,
+                        isRemovable: volume.isRemovable,
+                        isInternal: volume.isInternal,
+                        freeBytes: volume.freeBytes,
+                        totalBytes: volume.totalBytes,
+                        isGenericName: volume.isGenericName,
+                        fileSystem: volume.fileSystem
+                    )
+                }
             }
         }
     }
 
-    private struct DiskIdentity {
+    private nonisolated struct DiskIdentity {
         let bsdNode: String
         let volumeUUID: String?
         let mediaUUID: String?
@@ -145,11 +190,11 @@ public class VolumeMonitor: ObservableObject {
         }
     }
 
-    private static func normalizeName(_ name: String) -> String {
+    private nonisolated static func normalizeName(_ name: String) -> String {
         name.precomposedStringWithCanonicalMapping.uppercased()
     }
 
-    static func isEligibleExternalMedia(
+    nonisolated static func isEligibleExternalMedia(
         diskInternal: Bool?,
         diskRemovable: Bool?,
         diskExternal: Bool?,
@@ -160,12 +205,12 @@ public class VolumeMonitor: ObservableObject {
         return diskRemovable == true || diskExternal == true || foundationRemovable == true
     }
 
-    static func resolvedVolumeName(diskVolumeName: String?, mountURL: URL) -> String {
+    nonisolated static func resolvedVolumeName(diskVolumeName: String?, mountURL: URL) -> String {
         let trimmed = diskVolumeName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? mountURL.lastPathComponent : trimmed
     }
 
-    private static func diskIdentity(for path: String) -> DiskIdentity? {
+    private nonisolated static func diskIdentity(for path: String) -> DiskIdentity? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
         process.arguments = ["info", "-plist", path]

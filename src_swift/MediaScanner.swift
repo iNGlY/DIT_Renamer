@@ -51,6 +51,10 @@ public class MediaScanner {
         var scanTruncated = false
         
         for case let fileURL as URL in enumerator {
+            if Task.isCancelled {
+                scanTruncated = true
+                break
+            }
             let name = fileURL.lastPathComponent
             let ext = fileURL.pathExtension.lowercased()
             let isDir = (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
@@ -328,6 +332,26 @@ public class MediaScanner {
             isScanComplete: !scanTruncated,
             needsExifToolInstallation: needsExifToolInstallation
         )
+    }
+
+    public static func mediaFingerprint(volumePath: String) -> (firstClipName: String?, lastClipName: String?) {
+        let url = URL(fileURLWithPath: volumePath)
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return (nil, nil) }
+
+        let videoExtensions: Set<String> = ["mov", "mp4", "mxf", "ari", "arx", "crm", "r3d", "braw", "nev"]
+        var clipNames: [String] = []
+        for case let fileURL as URL in enumerator {
+            if Task.isCancelled { return (nil, nil) }
+            guard videoExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
+            clipNames.append(fileURL.lastPathComponent)
+            if clipNames.count > 5000 { return (nil, nil) }
+        }
+        clipNames.sort()
+        return (clipNames.first, clipNames.last)
     }
 
     private static func detectSonyModel(fromSidecars sidecars: [URL]) -> String? {

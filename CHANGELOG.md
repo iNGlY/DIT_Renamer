@@ -15,6 +15,8 @@
 - 自动重命名改为严格串行队列，避免两张卡同时完成扫描时第二张因忙碌状态被遗漏；重复挂载事件会合并。
 - 相同 UUID 但首末素材不同的卡可分别自动处理；UUID 和首末素材都相同的疑似克隆卡必须人工确认。
 - 增加中英双语、无需命令行的安装与故障排除教程，明确 macOS 14、无需额外运行库、可选 exiftool、权限与 Gatekeeper 图形界面处理流程。
+- 增加挂载会话与扫描 generation 身份，快速换卡或取消重扫时旧结果不会进入新卡待办；拔卡候选立即失效。
+- Media UUID 缺失时，执行前再次核对首末素材；重挂载最终复核允许最多 5 秒的系统登记延迟。
 
 ### English
 
@@ -29,6 +31,8 @@
 - Added a strictly sequential automatic-rename queue so a second card is not skipped when two scans finish together; duplicate mount events are coalesced.
 - Cards sharing a UUID remain auto-eligible when first/last clips differ. Exact UUID and clip-identity duplicates require operator review.
 - Added a bilingual, Terminal-free installation and troubleshooting guide covering macOS 14, bundled dependencies, optional exiftool, permissions, and Apple's GUI Gatekeeper flow.
+- Added mount-session and scan-generation identities so stale scan results cannot attach to a replacement card; candidates become stale as soon as their mount session disappears.
+- When Media UUID is unavailable, the app rechecks first/last clip identity before execution. Final remount verification now tolerates up to five seconds of macOS registration delay.
 
 ## 1.1.1 — 2026-08-10
 

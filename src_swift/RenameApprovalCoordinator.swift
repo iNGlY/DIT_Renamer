@@ -11,6 +11,7 @@ final class RenameApprovalCoordinator: ObservableObject {
 
     private let store = RenameApprovalStore.shared
     private var scanTasks: [String: Task<Void, Never>] = [:]
+    private var scanGenerations: [String: UUID] = [:]
     private var scannedVolumeKeys = Set<String>()
     private var excludedMountPaths = Set<String>()
     private let automaticRenameQueue = AutomaticRenameQueue()
@@ -27,14 +28,29 @@ final class RenameApprovalCoordinator: ObservableObject {
     func refresh(volumes: [MountedVolume]) {
         isScanning = true
         let eligible = volumes.filter { $0.isRemovable && !$0.isInternal && $0.volumeUUID != nil }
+        let mountedSessionIDs = Set(eligible.compactMap(\.mountSessionID))
+        let activeVolumeIDs = Set(eligible.map(\.id))
+        for id in Array(scanTasks.keys) where !activeVolumeIDs.contains(id) {
+            scanTasks[id]?.cancel()
+            scanTasks[id] = nil
+            scanGenerations[id] = nil
+        }
+        store.markStale(excludingMountedSessionIDs: mountedSessionIDs)
+        scannedVolumeKeys = scannedVolumeKeys.filter { key in
+            activeVolumeIDs.contains { key.hasPrefix("\($0)|") }
+        }
+        syncFromStore()
         for volume in eligible where scanTasks[volume.id] == nil {
             let id = volume.id
             let scanKey = "\(volume.id)|\(volume.name)|\(volume.path)|\(volume.fileSystem)"
             guard !scannedVolumeKeys.contains(scanKey) else { continue }
             scannedVolumeKeys.insert(scanKey)
+            let generation = UUID()
+            scanGenerations[id] = generation
             scanTasks[id] = Task.detached(priority: .userInitiated) { [weak self] in
                 let scan = MediaScanner.scan(volumePath: volume.path)
-                await self?.accept(scan: scan, volume: volume)
+                guard !Task.isCancelled else { return }
+                await self?.accept(scan: scan, volume: volume, generation: generation)
             }
         }
         isScanning = !scanTasks.isEmpty
@@ -43,6 +59,7 @@ final class RenameApprovalCoordinator: ObservableObject {
     func rescan(volumes: [MountedVolume]) {
         for task in scanTasks.values { task.cancel() }
         scanTasks.removeAll()
+        scanGenerations.removeAll()
         scannedVolumeKeys.removeAll()
         refresh(volumes: volumes)
     }
@@ -73,6 +90,9 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }) else {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
         }
+        guard candidate.state != .stale else {
+            return finish(candidateID: candidateID, success: false, message: "存储卡已卸载或挂载会话已变化，请重新插卡并扫描。", actualName: nil)
+        }
         guard let name = candidate.effectiveName else {
             return finish(candidateID: candidateID, success: false, message: "没有可批准的建议卷名。", actualName: nil)
         }
@@ -82,6 +102,9 @@ final class RenameApprovalCoordinator: ObservableObject {
     func assignVolumeName(candidateID: UUID, request: VolumeNameRequest) async -> RenameExecutionResult {
         guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }) else {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
+        }
+        guard candidate.state != .stale else {
+            return finish(candidateID: candidateID, success: false, message: "存储卡已卸载或挂载会话已变化，请重新插卡并扫描。", actualName: nil)
         }
         do {
             let name = try VolumeNameBuilder.build(request, fileSystem: candidate.fileSystem)
@@ -119,6 +142,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             bsdNode: candidate.bsdNode,
             volumeUUID: candidate.volumeUUID,
             mediaUUID: candidate.mediaUUID,
+            mountSessionID: candidate.mountSessionID,
             isRemovable: true,
             isInternal: false,
             freeBytes: 0,
@@ -128,14 +152,19 @@ final class RenameApprovalCoordinator: ObservableObject {
         )
         scannedVolumeKeys = scannedVolumeKeys.filter { !$0.hasPrefix("\(volume.id)|") }
         scanTasks[volume.id]?.cancel()
+        let generation = UUID()
+        scanGenerations[volume.id] = generation
         scanTasks[volume.id] = Task.detached(priority: .userInitiated) { [weak self] in
             let scan = MediaScanner.scan(volumePath: volume.path)
-            await self?.accept(scan: scan, volume: volume)
+            guard !Task.isCancelled else { return }
+            await self?.accept(scan: scan, volume: volume, generation: generation)
         }
     }
 
-    private func accept(scan: ScanResult, volume: MountedVolume) async {
+    private func accept(scan: ScanResult, volume: MountedVolume, generation: UUID) async {
+        guard scanGenerations[volume.id] == generation else { return }
         scanTasks[volume.id] = nil
+        scanGenerations[volume.id] = nil
         guard !excludedMountPaths.contains(volume.path) else {
             isScanning = !scanTasks.isEmpty
             return
@@ -166,6 +195,18 @@ final class RenameApprovalCoordinator: ObservableObject {
         }
         guard !candidate.volumeUUID.isEmpty else {
             return finish(candidateID: candidate.id, success: false, message: "未能确认卡片 UUID，已取消重命名。", actualName: nil)
+        }
+        if candidate.mediaUUID == nil {
+            let currentFingerprint = MediaScanner.mediaFingerprint(volumePath: candidate.mountPath)
+            guard currentFingerprint.firstClipName == candidate.firstClipName,
+                  currentFingerprint.lastClipName == candidate.lastClipName else {
+                return finish(
+                    candidateID: candidate.id,
+                    success: false,
+                    message: "重命名已取消：当前卡片的首末素材与扫描记录不一致，可能已换卡，请重新扫描。",
+                    actualName: nil
+                )
+            }
         }
 
         var approving = candidate

@@ -3,19 +3,50 @@ import Foundation
 public struct MountedVolume: Identifiable, Hashable {
     // BSD node keeps simultaneously mounted cards distinct even when cloned
     // FAT/exFAT media exposes the same volume UUID.
-    public var id: String { "\(volumeUUID ?? "NO-UUID")|\(bsdNode)" }
+    public var id: String { mountSessionID ?? "\(volumeUUID ?? "NO-UUID")|\(bsdNode)" }
     public let name: String
     public let originalName: String
     public let path: String
     public let bsdNode: String
     public let volumeUUID: String?
     public let mediaUUID: String?
+    public let mountSessionID: String?
     public let isRemovable: Bool
     public let isInternal: Bool
     public let freeBytes: Int64
     public let totalBytes: Int64
     public let isGenericName: Bool
     public let fileSystem: String
+
+    public init(
+        name: String,
+        originalName: String,
+        path: String,
+        bsdNode: String,
+        volumeUUID: String?,
+        mediaUUID: String?,
+        mountSessionID: String? = nil,
+        isRemovable: Bool,
+        isInternal: Bool,
+        freeBytes: Int64,
+        totalBytes: Int64,
+        isGenericName: Bool,
+        fileSystem: String
+    ) {
+        self.name = name
+        self.originalName = originalName
+        self.path = path
+        self.bsdNode = bsdNode
+        self.volumeUUID = volumeUUID
+        self.mediaUUID = mediaUUID
+        self.mountSessionID = mountSessionID
+        self.isRemovable = isRemovable
+        self.isInternal = isInternal
+        self.freeBytes = freeBytes
+        self.totalBytes = totalBytes
+        self.isGenericName = isGenericName
+        self.fileSystem = fileSystem
+    }
     
     public var usedBytes: Int64 { max(0, totalBytes - freeBytes) }
     

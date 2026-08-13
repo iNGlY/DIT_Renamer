@@ -27,6 +27,7 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     public let id: UUID
     public let volumeUUID: String
     public let mediaUUID: String?
+    public let mountSessionID: String?
     public let bsdNode: String
     public let mountPath: String
     public let originalName: String
@@ -53,6 +54,7 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
         self.id = id
         self.volumeUUID = volume.volumeUUID ?? ""
         self.mediaUUID = volume.mediaUUID
+        self.mountSessionID = volume.mountSessionID
         self.bsdNode = volume.bsdNode
         self.mountPath = volume.path
         self.originalName = volume.name
@@ -88,7 +90,7 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     }
 
     public var mountedIdentityKey: String {
-        "\(identityKey)|\(bsdNode)"
+        "\(identityKey)|\(bsdNode)|\(mountSessionID ?? "NO-SESSION")"
     }
 
     public func hasSameMediaIdentity(as other: RenameCandidate) -> Bool {

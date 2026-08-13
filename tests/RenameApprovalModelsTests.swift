@@ -101,6 +101,17 @@ struct RenameApprovalModelsTests {
         precondition(!clonedCandidateA.isSafeForAutomaticApproval(among: [clonedCandidateA, clonedCandidateB]), "Exact duplicate identities must require manual review")
         precondition(!clonedCandidateB.isSafeForAutomaticApproval(among: [clonedCandidateA, clonedCandidateB]), "Exact duplicate identities must require manual review")
 
+        let replacementVolume = MountedVolume(
+            name: "Untitled", originalName: "Untitled", path: "/Volumes/Untitled",
+            bsdNode: "disk4s1", volumeUUID: "DUPLICATE", mediaUUID: nil,
+            mountSessionID: "replacement-session",
+            isRemovable: true, isInternal: false, freeBytes: 1, totalBytes: 2,
+            isGenericName: true, fileSystem: "EXFAT"
+        )
+        let replacementCandidate = RenameCandidate(volume: replacementVolume, scan: scanA)
+        precondition(replacementVolume.id == "replacement-session", "A mount session must replace reusable BSD/UUID identity")
+        precondition(!candidateA.hasSameMountedIdentity(as: replacementCandidate), "A replacement card in the same slot must not inherit the previous mounted identity")
+
         print("RenameApprovalModelsTests: PASS")
     }
 }

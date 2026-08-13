@@ -110,7 +110,12 @@ public final class RenamerEngine {
                     return
                 }
 
-                guard let remounted = diskInfo(for: bsdNode),
+                guard let remounted = waitForRemountedDisk(
+                    bsdNode: bsdNode,
+                    expectedVolumeUUID: expectedVolumeUUID,
+                    expectedMediaUUID: mediaUUID,
+                    expectedName: normalizedName
+                ),
                       remounted.deviceIdentifier == bsdNode,
                       remounted.volumeUUID == expectedVolumeUUID,
                       mediaUUID == nil || remounted.mediaUUID == mediaUUID,
@@ -217,6 +222,28 @@ public final class RenamerEngine {
             mountPoint: plist["MountPoint"] as? String,
             volumeName: plist["VolumeName"] as? String
         )
+    }
+
+    private static func waitForRemountedDisk(
+        bsdNode: String,
+        expectedVolumeUUID: String,
+        expectedMediaUUID: String?,
+        expectedName: String,
+        timeout: TimeInterval = 5
+    ) -> DiskInfo? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let info = diskInfo(for: bsdNode),
+               info.deviceIdentifier == bsdNode,
+               info.volumeUUID == expectedVolumeUUID,
+               expectedMediaUUID == nil || info.mediaUUID == expectedMediaUUID,
+               info.volumeName == expectedName,
+               info.mountPoint != nil {
+                return info
+            }
+            Thread.sleep(forTimeInterval: 0.2)
+        } while Date() < deadline
+        return nil
     }
 
     private static func complete(

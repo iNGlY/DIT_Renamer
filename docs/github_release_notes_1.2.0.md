@@ -22,6 +22,8 @@ DIT Renamer 1.2.0 是后台优先的正式版本，主要操作可直接在菜�
 - UUID 相同但首末素材不同的卡允许分别自动处理；UUID 和首末素材完全相同的疑似克隆卡会禁止自动及批量批准。
 - 默认后台运行，加入本地通知、卡片忽略/恢复、菜单栏规则切换，以及 720/900/1180 逻辑点响应式主窗口。
 - 增加不依赖命令行的中英双语安装与故障排除指南，说明 macOS 14 最低版本、无需额外运行库、可选 exiftool、可移动卷宗权限、未知开发者和损坏提示的安全处理方式。
+- 增加挂载会话和扫描 generation 保护，快速拔插、同插槽换卡或取消重扫时不会接受过期扫描结果；卡片离线后旧待办会立即失效。
+- Media UUID 缺失时会在执行前重新核对首末素材；重挂载复核会在 5 秒内轮询，避免部分读卡器登记较慢导致假失败。
 - DIT Printer 仍为独立项目，Renamer 只保留只读审计数据接口。
 
 分发说明：
@@ -56,6 +58,8 @@ Included in this release:
 - Cards sharing a UUID remain auto-eligible when first/last clips differ. Exact UUID and clip-identity duplicates require operator review and cannot be batch-approved.
 - Added background-first operation, local notifications, ignore/restore controls, menu-bar rule switches, and responsive 720/900/1180-point main-window layouts.
 - Added a bilingual GUI-only installation and troubleshooting guide covering the macOS 14 minimum, bundled runtime requirements, optional exiftool, removable-volume permissions, unidentified-developer warnings, and damaged-download recovery.
+- Added mount-session and scan-generation protection so rapid removal, same-slot replacement, or a cancelled rescan cannot submit a stale result. Offline-card approvals become stale immediately.
+- When Media UUID is unavailable, first/last clip identity is checked again before execution. Remount verification polls for up to five seconds to avoid false failures on slower readers.
 - DIT Printer remains a separate project. Renamer keeps only its read-only audit-data interface.
 
 Distribution notes:
