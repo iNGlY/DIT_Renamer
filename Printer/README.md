@@ -30,6 +30,3 @@ ignored artifact from before this project was isolated.
 | `src/DITPrinterBridge.swift` | Silverstack manifest receiver and local job queue writer |
 | `src/Silverstack/` | Silverstack Lua post-step scripts |
 | `docs/` | Deployment material |
-
-Read [AGENTS.md](AGENTS.md), [CONVERSATION_EXPORT.md](CONVERSATION_EXPORT.md),
-and [ANTIGRAVITY_PROMPT.md](ANTIGRAVITY_PROMPT.md) before making changes.

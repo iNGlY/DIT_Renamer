@@ -9,8 +9,8 @@ BUILD_DIR="$PROJECT_ROOT/build_swift"
 RELEASE_DIR="${DIT_RENAMER_RELEASE_DIR:-$RELEASE_DIR}"
 BUILD_DIR="${DIT_RENAMER_BUILD_DIR:-$BUILD_DIR}"
 STAGED_RELEASE_DIR="$BUILD_DIR/Release"
-VERSION="${DIT_RENAMER_VERSION:-1.1.1}"
-BUILD_NUMBER="${DIT_RENAMER_BUILD_NUMBER:-1110}"
+VERSION="${DIT_RENAMER_VERSION:-1.2.0}"
+BUILD_NUMBER="${DIT_RENAMER_BUILD_NUMBER:-1200}"
 SPARKLE_PUBLIC_ED_KEY="${DIT_RENAMER_SPARKLE_PUBLIC_ED_KEY:-+X/X+R9CiO+z1igmTrgXdJWl6PPSD5zs0AS/iOq2gmk=}"
 SPARKLE_FEED_URL="${DIT_RENAMER_SPARKLE_FEED_URL:-https://ingly.github.io/DIT_Renamer/appcast.xml}"
 RELEASE_MODE="${DIT_RENAMER_RELEASE_MODE:-developer-id}"
@@ -82,10 +82,11 @@ else
 fi
 
 cd "$PROJECT_ROOT"
+RENAMER_DIRTY_STATUS="$(git status --porcelain -- . ':(exclude)Printer')"
 if [[ "${DIT_RENAMER_ALLOW_DIRTY_BUILD:-0}" == "1" ]]; then
     echo "[WARNING] Dirty-build override enabled; Release metadata is for local validation only."
 else
-    [[ -z "$(git status --porcelain)" ]] || fail "Commit all source changes and untracked files before creating a release."
+    [[ -z "$RENAMER_DIRTY_STATUS" ]] || fail "Commit all Renamer source changes and untracked files before creating a release."
 fi
 
 SPARKLE_ROOT="$(bash "$SCRIPT_DIR/bootstrap_sparkle.sh")"

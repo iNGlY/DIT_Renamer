@@ -82,7 +82,10 @@ public class VolumeMonitor: ObservableObject {
                 if excludeNTFS  && fsType == "NTFS"  { continue }
                 if excludeUDF   && fsType == "UDF"   { continue }
                 
-                let name = url.lastPathComponent
+                let name = Self.resolvedVolumeName(
+                    diskVolumeName: identity.volumeName,
+                    mountURL: url
+                )
                 let upperName = name.uppercased()
                 if ignoredNames.contains(Self.normalizeName(name)) { continue }
                 
@@ -129,6 +132,7 @@ public class VolumeMonitor: ObservableObject {
         let bsdNode: String
         let volumeUUID: String?
         let mediaUUID: String?
+        let volumeName: String?
         let mediaName: String?
         let busProtocol: String?
         let isInternal: Bool?
@@ -156,6 +160,11 @@ public class VolumeMonitor: ObservableObject {
         return diskRemovable == true || diskExternal == true || foundationRemovable == true
     }
 
+    static func resolvedVolumeName(diskVolumeName: String?, mountURL: URL) -> String {
+        let trimmed = diskVolumeName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? mountURL.lastPathComponent : trimmed
+    }
+
     private static func diskIdentity(for path: String) -> DiskIdentity? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
@@ -179,6 +188,7 @@ public class VolumeMonitor: ObservableObject {
             bsdNode: bsdNode,
             volumeUUID: plist["VolumeUUID"] as? String,
             mediaUUID: plist["MediaUUID"] as? String,
+            volumeName: plist["VolumeName"] as? String,
             mediaName: plist["MediaName"] as? String,
             busProtocol: plist["BusProtocol"] as? String,
             isInternal: plist["Internal"] as? Bool,

@@ -35,3 +35,6 @@ env/
 # Local collaboration instructions and handoff records.
 /AGENTS.md
 /.agents/
+/Printer/AGENTS.md
+/Printer/ANTIGRAVITY_PROMPT.md
+/Printer/CONVERSATION_EXPORT.md

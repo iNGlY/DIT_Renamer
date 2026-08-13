@@ -87,8 +87,57 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
         "\(volumeUUID)|\(firstClipName ?? "")|\(lastClipName ?? "")"
     }
 
+    public var mountedIdentityKey: String {
+        "\(identityKey)|\(bsdNode)"
+    }
+
     public func hasSameMediaIdentity(as other: RenameCandidate) -> Bool {
         identityKey == other.identityKey
+    }
+
+    public func hasSameMountedIdentity(as other: RenameCandidate) -> Bool {
+        mountedIdentityKey == other.mountedIdentityKey
+    }
+
+    public func isSafeForAutomaticApproval(among candidates: [RenameCandidate]) -> Bool {
+        guard canBeBatchApproved else { return false }
+        return !candidates.contains { other in
+            other.id != id
+                && hasSameMediaIdentity(as: other)
+                && !hasSameMountedIdentity(as: other)
+        }
+    }
+}
+
+@MainActor
+final class AutomaticRenameQueue {
+    private var candidateIDs: [UUID] = []
+    private var enqueuedIDs = Set<UUID>()
+    private(set) var isProcessing = false
+
+    var pendingCount: Int { candidateIDs.count }
+
+    func enqueue(
+        _ candidateID: UUID,
+        operation: @escaping @MainActor (UUID) async -> Void
+    ) {
+        guard enqueuedIDs.insert(candidateID).inserted else { return }
+        candidateIDs.append(candidateID)
+        guard !isProcessing else { return }
+
+        isProcessing = true
+        Task { [weak self] in
+            await self?.drain(operation: operation)
+        }
+    }
+
+    private func drain(operation: @escaping @MainActor (UUID) async -> Void) async {
+        while !candidateIDs.isEmpty {
+            let candidateID = candidateIDs.removeFirst()
+            await operation(candidateID)
+            enqueuedIDs.remove(candidateID)
+        }
+        isProcessing = false
     }
 }
 

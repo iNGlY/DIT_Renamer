@@ -50,6 +50,20 @@ struct VolumeMonitorEligibilityTests {
             ),
             "Foundation removable evidence may admit a confirmed non-internal reader"
         )
+        require(
+            VolumeMonitor.resolvedVolumeName(
+                diskVolumeName: "Untitled",
+                mountURL: URL(fileURLWithPath: "/Volumes/Untitled 1")
+            ) == "Untitled",
+            "A collision-suffixed mount directory must not replace the real camera-card volume label"
+        )
+        require(
+            VolumeMonitor.resolvedVolumeName(
+                diskVolumeName: nil,
+                mountURL: URL(fileURLWithPath: "/Volumes/Fallback Card")
+            ) == "Fallback Card",
+            "The mount directory remains a safe fallback when diskutil omits VolumeName"
+        )
         print("VolumeMonitorEligibilityTests passed")
     }
 }

@@ -13,13 +13,16 @@ final class RenameApprovalCoordinator: ObservableObject {
     private var scanTasks: [String: Task<Void, Never>] = [:]
     private var scannedVolumeKeys = Set<String>()
     private var excludedMountPaths = Set<String>()
+    private let automaticRenameQueue = AutomaticRenameQueue()
 
     private init() {
         pendingCandidates = store.candidates
     }
 
     var pendingCount: Int { pendingCandidates.filter { $0.state == .pending || $0.state == .failed }.count }
-    var batchCandidates: [RenameCandidate] { pendingCandidates.filter(\.canBeBatchApproved) }
+    var batchCandidates: [RenameCandidate] {
+        pendingCandidates.filter { $0.isSafeForAutomaticApproval(among: pendingCandidates) }
+    }
 
     func refresh(volumes: [MountedVolume]) {
         isScanning = true
@@ -63,7 +66,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard candidate.effectiveName != nil || !volume.isUniqueCameraName else { return nil }
         store.upsert(candidate)
         syncFromStore()
-        return pendingCandidates.first(where: { $0.hasSameMediaIdentity(as: candidate) })
+        return pendingCandidates.first(where: { $0.hasSameMountedIdentity(as: candidate) })
     }
 
     func approveSuggestedName(candidateID: UUID) async -> RenameExecutionResult {
@@ -139,8 +142,19 @@ final class RenameApprovalCoordinator: ObservableObject {
         }
         if scan.isScanComplete, let candidate = ingest(volume: volume, scan: scan) {
             let automatic = UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled")
-            if automatic && volume.isGenericName && candidate.canBeBatchApproved {
-                _ = await approveSuggestedName(candidateID: candidate.id)
+            if automatic
+                && volume.isGenericName
+                && candidate.isSafeForAutomaticApproval(among: pendingCandidates) {
+                automaticRenameQueue.enqueue(candidate.id) { [weak self] candidateID in
+                    guard let self else { return }
+                    while self.isScanning || MediaOperationCoordinator.shared.isBusy {
+                        try? await Task.sleep(nanoseconds: 200_000_000)
+                    }
+                    guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled"),
+                          let current = self.pendingCandidates.first(where: { $0.id == candidateID }),
+                          current.isSafeForAutomaticApproval(among: self.pendingCandidates) else { return }
+                    _ = await self.approveSuggestedName(candidateID: candidateID)
+                }
             }
         }
         isScanning = !scanTasks.isEmpty

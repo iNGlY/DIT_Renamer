@@ -25,7 +25,7 @@ public final class RenameApprovalStore: ObservableObject {
     }
 
     public func upsert(_ candidate: RenameCandidate) {
-        if let index = candidates.firstIndex(where: { $0.hasSameMediaIdentity(as: candidate) }) {
+        if let index = candidates.firstIndex(where: { $0.hasSameMountedIdentity(as: candidate) }) {
             let existing = candidates[index]
             guard existing.effectiveName != candidate.effectiveName
                     || existing.bsdNode != candidate.bsdNode

@@ -1,6 +1,6 @@
 # DIT Renamer 更新日志 / Changelog
 
-## 1.2.0 Test — 2026-08-12
+## 1.2.0 — 2026-08-13
 
 ### 中文
 
@@ -10,6 +10,10 @@
 - 增加 Sony `M4ROOT`、`XDROOT`、MP4 和 MXF 回归覆盖，改善部分 CFexpress Type A 读卡器的外置介质识别。
 - 修复重复 Volume UUID 的双卡运行时身份和审核队列冲突，仍在执行前复核 BSD 节点、Volume UUID 与可用的 Media UUID。
 - 继续对 FAT、MS-DOS 和 exFAT 执行 11 字符卷名上限，并在成功重命名后强制卸载和重挂载同一分区。
+- 默认在后台驻留菜单栏；加入通知、菜单栏卡片管理、规则切换和响应式主窗口。
+- 修复同名双卡挂载时第二张卡因 `/Volumes/Untitled 1` 被误判为非通用卷名的问题，改用 `diskutil` 的真实 VolumeName。
+- 自动重命名改为严格串行队列，避免两张卡同时完成扫描时第二张因忙碌状态被遗漏；重复挂载事件会合并。
+- 相同 UUID 但首末素材不同的卡可分别自动处理；UUID 和首末素材都相同的疑似克隆卡必须人工确认。
 
 ### English
 
@@ -19,6 +23,10 @@
 - Added Sony `M4ROOT`, `XDROOT`, MP4, and MXF regression coverage and improved external-media recognition for some CFexpress Type A readers.
 - Fixed runtime and approval-queue collisions for two cards that share a Volume UUID, while preserving BSD node, Volume UUID, and available Media UUID verification before execution.
 - Continued enforcing the 11-character FAT, MS-DOS, and exFAT volume-name limit and force-remounting the same partition after a successful rename.
+- Moved the default workflow to a background menu-bar utility with notifications, mounted-card controls, rule switches, and a responsive main window.
+- Fixed the second same-name card being treated as non-generic when macOS mounts it at `/Volumes/Untitled 1`; the app now uses `diskutil`'s real VolumeName.
+- Added a strictly sequential automatic-rename queue so a second card is not skipped when two scans finish together; duplicate mount events are coalesced.
+- Cards sharing a UUID remain auto-eligible when first/last clips differ. Exact UUID and clip-identity duplicates require operator review.
 
 ## 1.1.1 — 2026-08-10
 

@@ -83,7 +83,23 @@ struct RenameApprovalModelsTests {
         let candidateA = RenameCandidate(volume: duplicateUUIDA, scan: scanA)
         let candidateB = RenameCandidate(volume: duplicateUUIDB, scan: scanB)
         precondition(!candidateA.hasSameMediaIdentity(as: candidateB), "Different clips must keep duplicate-UUID cards as separate approvals")
+        precondition(!candidateA.hasSameMountedIdentity(as: candidateB), "Different readers must keep mounted cards operationally distinct")
         precondition(candidateA.canBeBatchApproved && candidateB.canBeBatchApproved, "Both high-confidence duplicate-UUID cards must remain batch eligible")
+        precondition(candidateA.isSafeForAutomaticApproval(among: [candidateA, candidateB]))
+        precondition(candidateB.isSafeForAutomaticApproval(among: [candidateA, candidateB]))
+
+        let clonedScan = ScanResult(
+            suggestedName: "A247", cameraLetter: "A", rollNumber: "247", suffix: nil,
+            deviceType: "Sony FX3", clipCount: 2, totalFileCount: 4,
+            firstClipName: "A247C001.MP4", lastClipName: "A247C002.MP4",
+            isHighConfidence: true
+        )
+        let clonedCandidateA = RenameCandidate(volume: duplicateUUIDA, scan: clonedScan)
+        let clonedCandidateB = RenameCandidate(volume: duplicateUUIDB, scan: clonedScan)
+        precondition(clonedCandidateA.hasSameMediaIdentity(as: clonedCandidateB), "Cloned media should retain the same content identity")
+        precondition(!clonedCandidateA.hasSameMountedIdentity(as: clonedCandidateB), "Cloned cards in two readers must not overwrite each other in the live queue")
+        precondition(!clonedCandidateA.isSafeForAutomaticApproval(among: [clonedCandidateA, clonedCandidateB]), "Exact duplicate identities must require manual review")
+        precondition(!clonedCandidateB.isSafeForAutomaticApproval(among: [clonedCandidateA, clonedCandidateB]), "Exact duplicate identities must require manual review")
 
         print("RenameApprovalModelsTests: PASS")
     }

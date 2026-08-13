@@ -154,7 +154,7 @@ final class OperatorAttentionCenter: NSObject, ObservableObject, UNUserNotificat
 
     func reconcile(candidates: [RenameCandidate]) {
         activeCandidateIDs = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
-        let activeIdentities = Set(candidates.map(\.identityKey))
+        let activeIdentities = Set(candidates.map(\.mountedIdentityKey))
         var known = knownIdentities
         let resolved = known.subtracting(activeIdentities)
         if !resolved.isEmpty {
@@ -166,9 +166,9 @@ final class OperatorAttentionCenter: NSObject, ObservableObject, UNUserNotificat
         }
 
         let automatic = defaults.bool(forKey: "menuBarAutoRenameEnabled")
-        for candidate in candidates where !known.contains(candidate.identityKey) {
-            known.insert(candidate.identityKey)
-            if automatic && candidate.canBeBatchApproved { continue }
+        for candidate in candidates where !known.contains(candidate.mountedIdentityKey) {
+            known.insert(candidate.mountedIdentityKey)
+            if automatic && candidate.isSafeForAutomaticApproval(among: candidates) { continue }
             notifyReviewRequired(candidate)
         }
         saveKnownIdentities(known)
@@ -202,7 +202,7 @@ final class OperatorAttentionCenter: NSObject, ObservableObject, UNUserNotificat
             content.sound = .default
             content.userInfo = ["candidateID": candidate.id.uuidString]
             let request = UNNotificationRequest(
-                identifier: self.notificationIdentifier(candidate.identityKey),
+                identifier: self.notificationIdentifier(candidate.mountedIdentityKey),
                 content: content,
                 trigger: nil
             )

@@ -5,7 +5,7 @@ shopt -s nullglob
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSION="${DIT_RENAMER_VERSION:-1.1.1}"
+VERSION="${DIT_RENAMER_VERSION:-1.2.0}"
 UPDATE_DIR="${1:-$PROJECT_ROOT/Release}"
 APPCAST_PATH="${DIT_RENAMER_APPCAST_PATH:-$PROJECT_ROOT/docs/appcast.xml}"
 DOWNLOAD_PREFIX="${DIT_RENAMER_DOWNLOAD_URL_PREFIX:-https://github.com/iNGlY/DIT_Renamer/releases/download/v${VERSION}/}"

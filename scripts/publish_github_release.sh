@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RELEASE_DIR="$PROJECT_ROOT/Release"
-VERSION="${DIT_RENAMER_VERSION:-1.1.1}"
+VERSION="${DIT_RENAMER_VERSION:-1.2.0}"
 TAG="${DIT_RENAMER_TAG:-v${VERSION}}"
 ASSET_BASENAME="dit_renamer_Release_${VERSION}-adhoc-unnotarized"
 ZIP_PATH="$RELEASE_DIR/$ASSET_BASENAME.zip"
@@ -13,7 +13,7 @@ DMG_PATH="$RELEASE_DIR/$ASSET_BASENAME.dmg"
 APP_PATH="$RELEASE_DIR/DIT Renamer.app"
 CHECKSUM_PATH="$RELEASE_DIR/SHA256SUMS.txt"
 METADATA_PATH="$RELEASE_DIR/RELEASE_METADATA.txt"
-NOTES_PATH="${DIT_RENAMER_RELEASE_NOTES_PATH:-$PROJECT_ROOT/docs/github_release_notes_1.1.1.md}"
+NOTES_PATH="${DIT_RENAMER_RELEASE_NOTES_PATH:-$PROJECT_ROOT/docs/github_release_notes_${VERSION}.md}"
 LICENSE_PATH="$PROJECT_ROOT/LICENSE"
 NOTICE_PATH="$PROJECT_ROOT/NOTICE"
 
@@ -27,7 +27,7 @@ for required in git gh lipo shasum; do
 done
 
 cd "$PROJECT_ROOT"
-[[ -z "$(git status --porcelain)" ]] || fail "Commit all source changes before publishing."
+[[ -z "$(git status --porcelain -- . ':(exclude)Printer')" ]] || fail "Commit all Renamer source changes before publishing."
 gh auth status >/dev/null 2>&1 || fail "GitHub CLI is not authenticated. Run: gh auth login"
 git remote get-url origin >/dev/null 2>&1 || fail "Git remote 'origin' is not configured."
 
