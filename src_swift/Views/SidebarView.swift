@@ -19,11 +19,11 @@ struct SidebarView: View {
     }
 
     var recommendedVolumes: [MountedVolume] {
-        activeVolumes.filter { !$0.isUniqueCameraName }
+        activeVolumes.filter { $0.canAttemptManualRename && !$0.isUniqueCameraName }
     }
     
     var otherVolumes: [MountedVolume] {
-        activeVolumes.filter { $0.isUniqueCameraName }
+        activeVolumes.filter { !$0.canAttemptManualRename || $0.isUniqueCameraName }
     }
 
     var body: some View {
@@ -42,6 +42,11 @@ struct SidebarView: View {
                         .foregroundColor(.blue)
                 }
                 Spacer()
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help(langManager.text("重新读取存储卡并扫描素材", "Refresh cards and rescan media"))
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -181,6 +186,7 @@ struct SidebarView: View {
         }
     }
     
+    var onRefresh: () -> Void = {}
     var onShowAbout: () -> Void = {}
     var onShowSettings: () -> Void = {}
 
@@ -243,6 +249,24 @@ struct SidebarView: View {
                             .padding(.vertical, 1)
                             .background(Color.blue.opacity(0.2))
                             .foregroundColor(.blue)
+                            .cornerRadius(4)
+                    }
+
+                    if vol.isReadOnly {
+                        Text(langManager.text("只读", "Read Only"))
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.orange.opacity(0.2))
+                            .foregroundColor(.orange)
+                            .cornerRadius(4)
+                    } else if !vol.canAutomaticallyRename {
+                        Text(langManager.text("手动", "Manual"))
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.yellow.opacity(0.2))
+                            .foregroundColor(.yellow)
                             .cornerRadius(4)
                     }
                 }

@@ -71,6 +71,55 @@ struct RenameApprovalCoordinatorGateTests {
         precondition(!manual.success && manual.message.contains("扫描"))
 
         coordinator.endExternalScan(scanID)
+
+        let standardUUIDLessVolume = MountedVolume(
+            name: "A001",
+            originalName: "A001",
+            path: "/Volumes/A001 UUIDless Manual Test",
+            bsdNode: "disk99s1",
+            volumeUUID: nil,
+            mediaUUID: nil,
+            mountSessionID: "UUIDLESS-STANDARD-MANUAL-TEST",
+            isRemovable: true,
+            isInternal: false,
+            freeBytes: 1,
+            totalBytes: 2,
+            isGenericName: false,
+            fileSystem: "EXFAT",
+            accessLevel: .inspectionOnly,
+            isReadOnly: false
+        )
+        let standardScan = ScanResult(
+            suggestedName: nil,
+            cameraLetter: nil,
+            rollNumber: nil,
+            suffix: nil,
+            deviceType: "Sony FX3",
+            clipCount: 2,
+            totalFileCount: 4,
+            firstClipName: "C0001.MP4",
+            lastClipName: "C0002.MP4",
+            isHighConfidence: true
+        )
+        let standardCandidate = coordinator.ingest(
+            volume: standardUUIDLessVolume,
+            scan: standardScan
+        )
+        precondition(
+            standardCandidate != nil,
+            "A writable UUID-less card with a standard volume name must remain available for manual assignment"
+        )
+        precondition(
+            standardCandidate?.effectiveName == nil,
+            "A standard volume without a safe suggestion must wait for explicit manual assignment"
+        )
+        precondition(
+            standardCandidate?.canBeBatchApproved == false,
+            "A UUID-less standard volume must never enter batch approval"
+        )
+        if let standardCandidate {
+            coordinator.dismiss(candidateID: standardCandidate.id)
+        }
         print("RenameApprovalCoordinatorGateTests: PASS")
     }
 }

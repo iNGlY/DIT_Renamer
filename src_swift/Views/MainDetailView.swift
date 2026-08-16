@@ -18,7 +18,7 @@ struct MainDetailView: View {
     @State private var includeDetectedSuffix: Bool = true
     @State private var alertMessage: String? = nil
     @State private var isRenaming = false
-    @State private var isSuspiciousWarning = false
+    @State private var automaticReviewReason: AutomaticRenameReviewReason?
     @State private var externalScanID: UUID?
     
     enum ActiveAlert: Identifiable {
@@ -65,6 +65,21 @@ struct MainDetailView: View {
         return request
     }
 
+    private func automaticReviewMessage(for reason: AutomaticRenameReviewReason) -> String {
+        switch reason {
+        case .lowConfidence:
+            return langManager.text(
+                "素材结构或机型识别置信度不足，已暂停自动改名，请人工确认。",
+                "Camera or media-structure confidence is insufficient. Auto-rename is paused for manual review."
+            )
+        case .standardizedVolumeName:
+            return langManager.text(
+                "当前卷名已符合摄影机命名格式，已暂停自动覆盖；如需更名请人工确认。",
+                "The current volume name already follows a camera naming format. Automatic overwrite is paused; confirm manually to rename it."
+            )
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
@@ -83,17 +98,17 @@ struct MainDetailView: View {
                         .cornerRadius(4)
                 }
                 
-                // Suspicious Device Warning Toast
-                if isSuspiciousWarning {
+                // Automatic rename review notice
+                if let automaticReviewReason {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.yellow)
-                        Text(langManager.text("检测到存疑设备 (Unknown Device)：已暂停自动改名，请确认后手动改名。", "Suspicious device detected: Auto-rename paused, manual review required."))
+                        Text(automaticReviewMessage(for: automaticReviewReason))
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.yellow)
                         Spacer()
-                        Button(langManager.text("关闭", "Dismiss")) { isSuspiciousWarning = false }
+                        Button(langManager.text("关闭", "Dismiss")) { self.automaticReviewReason = nil }
                             .font(.caption2)
                             .buttonStyle(.borderless)
                             .foregroundColor(.yellow)
@@ -141,6 +156,38 @@ struct MainDetailView: View {
                 
                 if let vol = volume {
                     VStack(alignment: .leading, spacing: 10) {
+                        if vol.isReadOnly {
+                            HStack(spacing: 8) {
+                                Image(systemName: "lock.fill")
+                                    .foregroundColor(.orange)
+                                Text(langManager.text(
+                                    "该卷由 macOS 以只读方式挂载。可以浏览和分析素材，但文件系统不允许重命名。",
+                                    "This volume is mounted read-only by macOS. Media can be inspected, but the file system does not allow renaming."
+                                ))
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.orange)
+                            }
+                            .padding(9)
+                            .background(Color.orange.opacity(0.13))
+                            .cornerRadius(8)
+                        } else if !vol.canAutomaticallyRename {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.key.fill")
+                                    .foregroundColor(.yellow)
+                                Text(langManager.text(
+                                    "未取得标准 Volume UUID。仍允许手动重命名；自动重命名和批量批准保持关闭，执行前将复核 BSD 节点、挂载路径和首末素材。",
+                                    "No standard Volume UUID is available. Manual renaming remains available; automatic and batch approval stay disabled, with BSD node, mount path, and media fingerprint revalidation before execution."
+                                ))
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.yellow)
+                            }
+                            .padding(9)
+                            .background(Color.yellow.opacity(0.13))
+                            .cornerRadius(8)
+                        }
+
                         // Info Card
                         VStack(spacing: 6) {
                             HStack {
@@ -219,7 +266,7 @@ struct MainDetailView: View {
                         
                         // HDE reference estimate
                         if let hde = scanResult?.hdeResult, hde.isHDESupported {
-                            HDEInfoCardView(hde: hde, usedGBFormatted: vol.usedGBFormatted)
+                            HDEInfoCardView(hde: hde)
                         }
                         
                         // Manual Controls
@@ -313,6 +360,8 @@ struct MainDetailView: View {
                         .background(.ultraThinMaterial)
                         .cornerRadius(10)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                        .disabled(!vol.canAttemptManualRename)
+                        .opacity(vol.canAttemptManualRename ? 1 : 0.6)
                         
                         // Volume-name preview
                         VStack(spacing: 4) {
@@ -357,12 +406,12 @@ struct MainDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color.blue)
+                            .background(vol.canAttemptManualRename ? Color.blue : Color.gray)
                             .foregroundColor(.white)
                             .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
-                        .disabled(isRenaming || builtVolumeName == nil)
+                        .disabled(isRenaming || builtVolumeName == nil || !vol.canAttemptManualRename)
                     }
                     
                 } else {
@@ -419,6 +468,16 @@ struct MainDetailView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.blue)
             }
+            if let evidence = scanResult?.cameraMetadataEvidence {
+                let sourceLabels = evidence.source.labels
+                let confidenceLabels = evidence.confidence.labels
+                Text(langManager.text(
+                    "型号证据：\(sourceLabels.zh) · \(confidenceLabels.zh)置信度",
+                    "Model evidence: \(sourceLabels.en) · \(confidenceLabels.en) confidence"
+                ))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            }
             Text("\(langManager.text("首条素材", "First Clip")): \(scanResult?.firstClipName ?? langManager.text("搜索中...", "Searching..."))")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.secondary)
@@ -460,6 +519,13 @@ struct MainDetailView: View {
     
     private func executeRename() {
         guard let vol = volume else { return }
+        guard vol.canAttemptManualRename else {
+            activeAlert = .resultNotice(message: langManager.text(
+                "当前卷为只读或虚拟伴生卷，只能分析，无法由 macOS 执行重命名。",
+                "This is a read-only or virtual companion volume. It can be inspected, but macOS cannot rename it."
+            ))
+            return
+        }
         guard scanResult != nil, scanVolumeID == vol.id else {
             activeAlert = .resultNotice(message: langManager.text("请等待当前卡片扫描完成后再重命名。", "Wait for the selected volume scan to finish before renaming."))
             return
@@ -473,7 +539,7 @@ struct MainDetailView: View {
     
     private func checkAndAutoRename() {
         guard let v = volume, let result = scanResult else { return }
-        guard !isRenaming, scanVolumeID == v.id, result.isScanComplete else { return }
+        guard !isRenaming, v.canAutomaticallyRename, scanVolumeID == v.id, result.isScanComplete else { return }
         
         guard let targetName = builtVolumeName else { return }
         guard let candidate = approvalCoordinator.ingest(volume: v, scan: result, requestedName: targetName) else { return }
@@ -520,7 +586,7 @@ struct MainDetailView: View {
         duplicateCameraID = false
         includeReuseCount = false
         reuseInput = ""
-        isSuspiciousWarning = false
+        automaticReviewReason = nil
         guard let selectedVolume else { return }
 
         let volumeID = selectedVolume.id
@@ -537,8 +603,12 @@ struct MainDetailView: View {
                 self.scanResult = result
                 if let letter = result.cameraLetter { self.selectedLetter = letter }
                 if let roll = result.rollNumber { self.rollInput = roll }
-                self.isSuspiciousWarning = self.isAutoRenameEnabled &&
-                    (!result.isHighConfidence || !selectedVolume.isGenericName)
+                self.automaticReviewReason = AutomaticRenameReviewPolicy.reason(
+                    isAutoRenameEnabled: self.isAutoRenameEnabled,
+                    canAutomaticallyRename: selectedVolume.canAutomaticallyRename,
+                    isGenericVolumeName: selectedVolume.isGenericName,
+                    isHighConfidenceScan: result.isHighConfidence
+                )
                 if let builtVolumeName = self.builtVolumeName {
                     _ = self.approvalCoordinator.ingest(volume: selectedVolume, scan: result, requestedName: builtVolumeName)
                 }
@@ -553,7 +623,6 @@ struct MainDetailView: View {
 struct HDEInfoCardView: View {
     @ObservedObject var langManager = LanguageManager.shared
     let hde: HDEResult
-    let usedGBFormatted: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -565,7 +634,19 @@ struct HDEInfoCardView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.purple)
                 Spacer()
-                if hde.isCLIAvailable {
+                if hde.isHDEVolumeDetected {
+                    HStack(spacing: 3) {
+                        Image(systemName: "externaldrive.fill.badge.checkmark")
+                            .font(.system(size: 10))
+                        Text(langManager.text("已检测到 HDE 卷", "HDE Volume Detected"))
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.purple.opacity(0.2))
+                    .foregroundColor(.purple)
+                    .cornerRadius(4)
+                } else if hde.isCLIAvailable {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 10))
@@ -589,7 +670,7 @@ struct HDEInfoCardView: View {
                     Text(langManager.text("当前素材已用空间", "Used Space"))
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    Text(usedGBFormatted)
+                    Text(hde.sourceGBFormatted)
                         .font(.system(.body, design: .monospaced))
                         .fontWeight(.semibold)
                 }
@@ -619,6 +700,16 @@ struct HDEInfoCardView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.green)
                 }
+            }
+
+            if hde.isHDEVolumeDetected {
+                Text(langManager.text(
+                    "Codex HDE 虚拟 MXF 可能显示为 0 KB；这里按原始 ARRIRAW 素材逻辑大小和约 40% 节省的保守模型估算。",
+                    "Codex HDE virtual MXF files may report 0 KB. This estimate uses the original ARRIRAW logical size and a conservative model of about 40% savings."
+                ))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(12)
@@ -687,8 +778,8 @@ struct ExifToolInstallationBannerView: View {
                 .foregroundColor(.blue)
             VStack(alignment: .leading, spacing: 4) {
                 Text(langManager.text(
-                    "XML/XMP 未提供明确机型；可选的 exiftool 回退识别尚未安装。现有卷名判断不受影响。",
-                    "XML/XMP did not provide an explicit camera model, and optional exiftool fallback detection is not installed. Existing volume-name decisions are unaffected."
+                    "Sidecar/XML 未提供明确机型；可选的 exiftool 回退识别尚未安装。现有卷名判断不受影响。",
+                    "Sidecar/XML did not provide an explicit camera model, and optional exiftool fallback detection is not installed. Existing volume-name decisions are unaffected."
                 ))
                 .font(.caption)
                 .fontWeight(.semibold)

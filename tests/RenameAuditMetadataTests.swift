@@ -31,7 +31,24 @@ struct RenameAuditMetadataTests {
             dateDayString: "1970-01-01",
             requestedName: "B001",
             reuseCount: 2,
-            duplicateIndex: nil
+            duplicateIndex: nil,
+            volumeUUID: "VOL-B001",
+            mediaUUID: "MEDIA-B001",
+            bsdNode: "disk5s1",
+            mountedPath: "/Volumes/Untitled",
+            fileSystem: "exfat",
+            isHighConfidence: true,
+            isPhotoOnly: false,
+            isUnconfiguredCamera: false,
+            cameraMetadataEvidence: CameraMetadataEvidence(
+                manufacturer: "Sony",
+                exactModel: "FX3",
+                productFamily: "Sony Cinema Line",
+                source: .sonyNonRealTimeMeta,
+                confidence: .high,
+                isCameraNative: true,
+                sourceFileName: "A001C001M01.XML"
+            )
         )
 
         let encoder = JSONEncoder()
@@ -52,6 +69,21 @@ struct RenameAuditMetadataTests {
         )
         let withReuseJSON = String(data: try encoder.encode(documentWithReuse), encoding: .utf8)!
         precondition(withReuseJSON.contains("\"reuse_count\":2"), "Enabled reuse metadata must be exported")
+
+        let documentV2 = RenamerPrinterAuditDocumentV2(
+            schemaVersion: 2,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            records: [RenamerPrinterAuditRecordV2(withReuse)]
+        )
+        let v2JSON = String(data: try encoder.encode(documentV2), encoding: .utf8)!
+        precondition(v2JSON.contains("\"schema_version\":2"), "Printer audit v2 must advertise schema version 2")
+        precondition(v2JSON.contains("\"total_file_count\":4"), "Printer audit v2 must include total file count")
+        precondition(v2JSON.contains("\"used_space\":\"1.0 GB\""), "Printer audit v2 must include used space")
+        precondition(v2JSON.contains("\"file_system\":\"exfat\""), "Printer audit v2 must include file system")
+        precondition(v2JSON.contains("\"media_uuid\":\"MEDIA-B001\""), "Printer audit v2 must include media identity")
+        precondition(v2JSON.contains("\"camera_metadata_evidence\""), "Printer audit v2 must retain camera metadata evidence")
+        precondition(v2JSON.contains("\"sony-non-real-time-meta\""), "Printer audit v2 must retain the sidecar source")
+        precondition(!v2JSON.contains("/Volumes/"), "Camera metadata evidence must not leak an absolute source path")
 
         let pdfWithoutReuse = RenameAuditFormatting.pdfReuseHeaderHTML(items: [withoutReuse], isChinese: true)
         precondition(pdfWithoutReuse.isEmpty, "PDF must omit the reuse-count column when no record contains reuse metadata")

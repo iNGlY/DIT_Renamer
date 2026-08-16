@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RELEASE_DIR="$PROJECT_ROOT/Release"
-VERSION="${DIT_RENAMER_VERSION:-1.2.0}"
+VERSION="${DIT_RENAMER_VERSION:-1.2.1}"
 TAG="${DIT_RENAMER_TAG:-v${VERSION}}"
 ASSET_BASENAME="dit_renamer_Release_${VERSION}-adhoc-unnotarized"
 ZIP_PATH="$RELEASE_DIR/$ASSET_BASENAME.zip"

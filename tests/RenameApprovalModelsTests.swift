@@ -152,6 +152,32 @@ struct RenameApprovalModelsTests {
         precondition(candidateA.isSafeForAutomaticApproval(among: [candidateA, candidateB]))
         precondition(candidateB.isSafeForAutomaticApproval(among: [candidateA, candidateB]))
 
+        let uuidlessSonyVolume = MountedVolume(
+            name: "Untitled",
+            originalName: "Untitled",
+            path: "/Volumes/Untitled UUIDless",
+            bsdNode: "disk10s1",
+            volumeUUID: nil,
+            mediaUUID: nil,
+            isRemovable: true,
+            isInternal: false,
+            freeBytes: 1,
+            totalBytes: 2,
+            isGenericName: true,
+            fileSystem: "EXFAT",
+            accessLevel: .inspectionOnly,
+            isReadOnly: false
+        )
+        let uuidlessSonyCandidate = RenameCandidate(volume: uuidlessSonyVolume, scan: scanA)
+        precondition(
+            !uuidlessSonyCandidate.canBeBatchApproved,
+            "A UUID-less Sony card must require deliberate manual execution"
+        )
+        precondition(
+            !uuidlessSonyCandidate.isSafeForAutomaticApproval(among: [uuidlessSonyCandidate]),
+            "A UUID-less Sony card must never enter automatic approval"
+        )
+
         let sameTargetScanA = ScanResult(
             suggestedName: "A001", cameraLetter: "A", rollNumber: "001", suffix: nil,
             deviceType: "Sony FX3", clipCount: 2, totalFileCount: 4,
@@ -220,6 +246,34 @@ struct RenameApprovalModelsTests {
         let replacementCandidate = RenameCandidate(volume: replacementVolume, scan: scanA)
         precondition(replacementVolume.id == "replacement-session", "A mount session must replace reusable BSD/UUID identity")
         precondition(!candidateA.hasSameMountedIdentity(as: replacementCandidate), "A replacement card in the same slot must not inherit the previous mounted identity")
+
+        precondition(
+            AutomaticRenameReviewPolicy.reason(
+                isAutoRenameEnabled: true,
+                canAutomaticallyRename: false,
+                isGenericVolumeName: false,
+                isHighConfidenceScan: true
+            ) == nil,
+            "Read-only UDF/HDE media must not be mislabeled as an unknown device"
+        )
+        precondition(
+            AutomaticRenameReviewPolicy.reason(
+                isAutoRenameEnabled: true,
+                canAutomaticallyRename: true,
+                isGenericVolumeName: true,
+                isHighConfidenceScan: false
+            ) == .lowConfidence,
+            "A writable low-confidence scan must request camera/media review"
+        )
+        precondition(
+            AutomaticRenameReviewPolicy.reason(
+                isAutoRenameEnabled: true,
+                canAutomaticallyRename: true,
+                isGenericVolumeName: false,
+                isHighConfidenceScan: true
+            ) == .standardizedVolumeName,
+            "A writable standardized volume name must request overwrite confirmation without calling the device unknown"
+        )
 
         print("RenameApprovalModelsTests: PASS")
     }

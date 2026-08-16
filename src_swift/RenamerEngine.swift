@@ -49,7 +49,7 @@ public final class RenamerEngine {
             return
         }
 
-        guard bsdNode.range(of: #"^disk[0-9]+s[0-9]+$"#, options: .regularExpression) != nil else {
+        guard bsdNode.range(of: #"^disk[0-9]+(s[0-9]+)?$"#, options: .regularExpression) != nil else {
             complete(completion, success: false, message: "重命名失败：未确认有效的卷分区 BSD 节点。")
             return
         }
@@ -58,10 +58,13 @@ public final class RenamerEngine {
             guard let before = diskInfo(for: path),
                   before.deviceIdentifier == bsdNode,
                   before.mountPoint == path,
-                  let expectedVolumeUUID = volumeUUID,
-                  before.volumeUUID == expectedVolumeUUID,
-                  mediaUUID == nil || before.mediaUUID == mediaUUID else {
-                complete(completion, success: false, message: "重命名已取消：目标卷的挂载路径、BSD 节点或 UUID 已变化，可能已拔卡或被复用。")
+                  matchesExpectedIdentity(
+                    actualVolumeUUID: before.volumeUUID,
+                    expectedVolumeUUID: volumeUUID,
+                    actualMediaUUID: before.mediaUUID,
+                    expectedMediaUUID: mediaUUID
+                  ) else {
+                complete(completion, success: false, message: "重命名已取消：目标卷的挂载路径、BSD 节点或可用设备标识已变化，可能已拔卡或被复用。")
                 return
             }
 
@@ -94,13 +97,17 @@ public final class RenamerEngine {
 
                 guard let after = diskInfo(for: bsdNode),
                       after.deviceIdentifier == bsdNode,
-                      after.volumeUUID == expectedVolumeUUID,
-                      mediaUUID == nil || after.mediaUUID == mediaUUID,
+                      matchesExpectedIdentity(
+                        actualVolumeUUID: after.volumeUUID,
+                        expectedVolumeUUID: volumeUUID,
+                        actualMediaUUID: after.mediaUUID,
+                        expectedMediaUUID: mediaUUID
+                      ),
                       after.volumeName == normalizedName else {
                     complete(
                         completion,
                         success: false,
-                        message: "重命名已执行，但未通过同一 BSD 节点和 UUID 复核，请人工检查卷名后再继续。",
+                        message: "重命名已执行，但未通过同一 BSD 节点和可用设备标识复核，请人工检查卷名后再继续。",
                         actualName: normalizedName
                     )
                     return
@@ -132,19 +139,23 @@ public final class RenamerEngine {
 
                 guard let remounted = waitForRemountedDisk(
                     bsdNode: bsdNode,
-                    expectedVolumeUUID: expectedVolumeUUID,
+                    expectedVolumeUUID: volumeUUID,
                     expectedMediaUUID: mediaUUID,
                     expectedName: normalizedName
                 ),
                       remounted.deviceIdentifier == bsdNode,
-                      remounted.volumeUUID == expectedVolumeUUID,
-                      mediaUUID == nil || remounted.mediaUUID == mediaUUID,
+                      matchesExpectedIdentity(
+                        actualVolumeUUID: remounted.volumeUUID,
+                        expectedVolumeUUID: volumeUUID,
+                        actualMediaUUID: remounted.mediaUUID,
+                        expectedMediaUUID: mediaUUID
+                      ),
                       remounted.volumeName == normalizedName,
                       remounted.mountPoint != nil else {
                     complete(
                         completion,
                         success: false,
-                        message: "卷已重命名并执行重挂载，但最终 UUID、卷名或挂载点复核失败，请人工检查。",
+                        message: "卷已重命名并执行重挂载，但最终设备标识、卷名或挂载点复核失败，请人工检查。",
                         actualName: after.volumeName
                     )
                     return
@@ -323,6 +334,23 @@ public final class RenamerEngine {
         return result
     }
 
+    static func matchesExpectedIdentity(
+        actualVolumeUUID: String?,
+        expectedVolumeUUID: String?,
+        actualMediaUUID: String?,
+        expectedMediaUUID: String?
+    ) -> Bool {
+        if let expectedVolumeUUID, !expectedVolumeUUID.isEmpty,
+           actualVolumeUUID != expectedVolumeUUID {
+            return false
+        }
+        if let expectedMediaUUID, !expectedMediaUUID.isEmpty,
+           actualMediaUUID != expectedMediaUUID {
+            return false
+        }
+        return true
+    }
+
     private static func collectMountedVolumes(
         from value: Any,
         into result: inout [MountedVolumeInventoryItem]
@@ -355,7 +383,7 @@ public final class RenamerEngine {
 
     private static func waitForRemountedDisk(
         bsdNode: String,
-        expectedVolumeUUID: String,
+        expectedVolumeUUID: String?,
         expectedMediaUUID: String?,
         expectedName: String,
         timeout: TimeInterval = 5
@@ -364,8 +392,12 @@ public final class RenamerEngine {
         repeat {
             if let info = diskInfo(for: bsdNode),
                info.deviceIdentifier == bsdNode,
-               info.volumeUUID == expectedVolumeUUID,
-               expectedMediaUUID == nil || info.mediaUUID == expectedMediaUUID,
+               matchesExpectedIdentity(
+                    actualVolumeUUID: info.volumeUUID,
+                    expectedVolumeUUID: expectedVolumeUUID,
+                    actualMediaUUID: info.mediaUUID,
+                    expectedMediaUUID: expectedMediaUUID
+               ),
                info.volumeName == expectedName,
                info.mountPoint != nil {
                 return info

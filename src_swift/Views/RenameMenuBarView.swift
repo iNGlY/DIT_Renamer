@@ -32,6 +32,7 @@ struct RenameMenuBarView: View {
     @State private var includeReuseCount = false
     @State private var duplicateCameraID = false
     @State private var includeSuffix = true
+    @State private var pendingStandardRename: StandardRenameConfirmation?
 
     private enum MenuSection: String, CaseIterable, Identifiable {
         case cards
@@ -40,6 +41,18 @@ struct RenameMenuBarView: View {
         case more
 
         var id: String { rawValue }
+    }
+
+    private struct StandardRenameConfirmation: Identifiable {
+        enum Action {
+            case approveSuggested
+            case assign(VolumeNameRequest)
+        }
+
+        let id = UUID()
+        let candidateID: UUID
+        let originalName: String
+        let action: Action
     }
 
     var body: some View {
@@ -116,6 +129,19 @@ struct RenameMenuBarView: View {
                 "Cards are processed sequentially with UUID revalidation and forced remounting; the batch stops after the first failure."
             ))
         }
+        .alert(item: $pendingStandardRename) { confirmation in
+            Alert(
+                title: Text(langManager.text("确认覆盖规范卷名？", "Overwrite Standard Volume Name?")),
+                message: Text(langManager.text(
+                    "当前卷名 \(confirmation.originalName) 已符合摄影机规范命名格式。继续操作会覆盖摄影机生成的卷名，请确认这是有意的手动操作。",
+                    "The current volume name \(confirmation.originalName) already follows a camera naming convention. Continuing will overwrite the camera-generated name."
+                )),
+                primaryButton: .destructive(Text(langManager.text("确认重命名", "Rename Anyway"))) {
+                    performConfirmedRename(confirmation)
+                },
+                secondaryButton: .cancel(Text(langManager.text("取消", "Cancel")))
+            )
+        }
     }
 
     private var header: some View {
@@ -171,6 +197,13 @@ struct RenameMenuBarView: View {
                             Text(volume.name).fontWeight(.semibold).lineLimit(1)
                             Text("/dev/\(volume.bsdNode) · \(volume.fileSystem) · \(volume.usedGBFormatted)")
                                 .font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                            if volume.isReadOnly {
+                                Text(langManager.text("只读分析", "Read-only inspection"))
+                                    .font(.caption2).foregroundColor(.orange)
+                            } else if !volume.canAutomaticallyRename {
+                                Text(langManager.text("可手动重命名 · 自动与批量已关闭", "Manual rename available · Auto and batch disabled"))
+                                    .font(.caption2).foregroundColor(.yellow)
+                            }
                         }
                         Spacer()
                         Button(ignored ? langManager.text("恢复", "Restore") : langManager.text("忽略", "Ignore")) {
@@ -241,7 +274,7 @@ struct RenameMenuBarView: View {
 
             if MediaScanner.exifToolPath == nil {
                 Label(
-                    langManager.text("exiftool 未安装；XML/XMP 识别仍可正常工作。", "exiftool is not installed; XML/XMP detection still works."),
+                    langManager.text("exiftool 未安装；Sidecar/XML 识别仍可正常工作。", "exiftool is not installed; sidecar/XML detection still works."),
                     systemImage: "exclamationmark.triangle"
                 )
                 .font(.caption)
@@ -362,6 +395,17 @@ struct RenameMenuBarView: View {
                     Text(candidate.originalName).font(.headline)
                     Text("\(candidate.deviceType) · /dev/\(candidate.bsdNode)")
                         .font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                    if let evidence = candidate.cameraMetadataEvidence {
+                        let sourceLabels = evidence.source.labels
+                        let confidenceLabels = evidence.confidence.labels
+                        Text(langManager.text(
+                            "\(sourceLabels.zh) · \(confidenceLabels.zh)置信度",
+                            "\(sourceLabels.en) · \(confidenceLabels.en) confidence"
+                        ))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    }
                 }
                 Spacer()
                 if candidate.state == .approving { ProgressView().controlSize(.small) }
@@ -388,9 +432,27 @@ struct RenameMenuBarView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
+            if !candidate.hasStableVolumeIdentity {
+                Text(langManager.text(
+                    "未取得标准 Volume UUID：可手动批准或指派，自动与批量执行保持关闭。",
+                    "No standard Volume UUID: manual approval or assignment is available; automatic and batch execution remain disabled."
+                ))
+                .font(.caption)
+                .foregroundColor(.yellow)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack(spacing: 8) {
                 Button(langManager.text("批准", "Approve")) {
-                    Task { notice = await coordinator.approveSuggestedName(candidateID: candidate.id).message }
+                    if candidate.hasGenericOriginalName {
+                        Task { notice = await coordinator.approveSuggestedName(candidateID: candidate.id).message }
+                    } else {
+                        pendingStandardRename = StandardRenameConfirmation(
+                            candidateID: candidate.id,
+                            originalName: candidate.originalName,
+                            action: .approveSuggested
+                        )
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(candidate.effectiveName == nil || coordinator.isScanning || candidate.state == .approving || candidate.state == .stale || hasTargetConflict || MediaOperationCoordinator.shared.isBusy)
@@ -462,10 +524,14 @@ struct RenameMenuBarView: View {
                 .foregroundColor(preview == nil ? .red : .green)
 
             Button {
-                Task {
-                    let result = await coordinator.assignVolumeName(candidateID: candidate.id, request: request)
-                    notice = result.message
-                    if result.success { selectedCandidateID = nil }
+                if candidate.hasGenericOriginalName {
+                    performAssignment(candidateID: candidate.id, request: request)
+                } else {
+                    pendingStandardRename = StandardRenameConfirmation(
+                        candidateID: candidate.id,
+                        originalName: candidate.originalName,
+                        action: .assign(request)
+                    )
                 }
             } label: {
                 Text(langManager.text("确认重命名并重挂载", "Rename and Remount"))
@@ -497,6 +563,23 @@ struct RenameMenuBarView: View {
             ) ?? 0
         }
         return request
+    }
+
+    private func performConfirmedRename(_ confirmation: StandardRenameConfirmation) {
+        switch confirmation.action {
+        case .approveSuggested:
+            Task { notice = await coordinator.approveSuggestedName(candidateID: confirmation.candidateID).message }
+        case .assign(let request):
+            performAssignment(candidateID: confirmation.candidateID, request: request)
+        }
+    }
+
+    private func performAssignment(candidateID: UUID, request: VolumeNameRequest) {
+        Task {
+            let result = await coordinator.assignVolumeName(candidateID: candidateID, request: request)
+            notice = result.message
+            if result.success { selectedCandidateID = nil }
+        }
     }
 
     private func ruleToggle(_ title: String, binding: Binding<Bool>) -> some View {

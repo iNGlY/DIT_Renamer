@@ -48,8 +48,12 @@ final class AppRuntime: ObservableObject {
     }
 
     func refreshAll() {
-        volumeMonitor.refreshVolumes()
-        approvals.rescan(volumes: volumeMonitor.volumes.filter { !ignoredVolumes.paths.contains($0.path) })
+        volumeMonitor.refreshVolumes { [weak self] latestVolumes in
+            guard let self else { return }
+            self.approvals.rescan(
+                volumes: latestVolumes.filter { !self.ignoredVolumes.paths.contains($0.path) }
+            )
+        }
     }
 
     func refreshFilters() {

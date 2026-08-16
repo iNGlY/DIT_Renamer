@@ -1,4 +1,4 @@
-# DIT Renamer 1.2.0
+# DIT Renamer 1.2.1
 
 DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝开始前识别摄影机卡、确认卷名，并为每次重命名留下记录。它只修改 macOS 显示的卷名，不改卡内目录或素材文件。
 
@@ -9,7 +9,7 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - macOS 14 Sonoma 或更高版本。macOS 13 及更早版本不受支持。
 - Apple Silicon 与 Intel Mac 均可直接运行，不需要 Rosetta。
 - 不需要安装 Swift、Python、Java、Homebrew 或其它运行库；更新组件已经包含在 App 内，卷管理使用 macOS 自带工具。
-- `exiftool` 是可选组件。Sony 卡缺少可读取的 XML/XMP 时，它可以补充机型识别；未安装不会影响卡片扫描、卷名审批、重命名或重挂载。
+- `exiftool` 是可选组件。摄影机原生 Sidecar 无法提供具体型号时，它可以受限检查一条代表素材；未安装不会影响卡片扫描、卷名审批、重命名或重挂载。
 - 需要对摄影机卡具有读写权限。macOS 首次询问“可移动卷宗”访问权限时请选择“允许”；通知权限可选。
 
 ## 首次安装
@@ -36,15 +36,18 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
 - 两张同名卡同时挂载时，使用真实卷标而不是 macOS 自动添加编号的挂载目录名；即使 Volume UUID 相同，也按 BSD 节点与首末素材分别处理，并严格串行执行重命名与重挂载。
 - 两张已挂载卡若建议或手动目标卷名相同（例如两台 FX3 都为 `A001`），自动和批量重命名会同时暂停；DIT 必须先给至少一张加入 `_1`、`_2` 等冲突编号，或手动改为其他卷号。队列延迟只用于等待同时插入的卡完成扫描，最终仍以执行前的全体目标名复核为准。
-- 优先从 Sony XML/XMP 读取具体机型；需要时可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
+- 优先从摄影机原生 Sidecar 读取具体机型；Sidecar 证据不足时，可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
 - 覆盖 Sony FX3 的 `PRIVATE/M4ROOT/CLIP` + MP4 和 FX6 的 `XDROOT/Clip` + MXF 结构；具体型号仍以 XML/XMP 或可选 exiftool 元数据为准。
+- 优先解析摄影机原生 Sidecar：ARRI ALE、Sony NonRealTimeMeta XML 和 Panasonic P2 XML 可在字段明确且一致时显示具体机型；Canon XML/XMP、RED RMD、DJI SRT/XMP、Nikon N-RAW 与 Blackmagic BRAW sidecar 在证据不足时保守显示厂商工作流。
+- 主窗口、菜单栏待办和审计接口会记录型号证据来源与高/中/低置信度。NewsML、镜头字段、调色 sidecar、文件名或目录签名不会被冒充为具体摄影机型号。
 - 保存原卷名、新卷名、UUID、BSD 节点、首末素材和操作时间。
 - 只读解析 ParaShoot 日志，并按软件当前语言导出中文或英文 PDF。`missingFiles: 0` 显示为“校验通过”；路径明确匹配时，可选择加入高置信度关联详情。
-- 为检测到的 ARRIRAW 内容提供 HDE 容量参考。结果是估算值，不代表最终编码容量。
+- 优先从 ARRI 生成的 `*_AVID.ale` 读取摄影机型号、ARRIRAW 格式和 Reel 信息；ALE 缺失时使用有限 MXF 头部元数据作为后备，可识别 ALEXA 35 等具体型号。
+- 检测到配对的 Codex `_hde` X2XFUSE 卷时，将其视为 ARRI/Codex 摄影机介质，并从原始 UDF 卷的 ARRIRAW 逻辑大小提供 HDE 容量参考。结果是保守估算值，不代表最终编码容量。
 - 启动时检查更新；只有发现新版本才显示提示，重命名或重挂载期间不会安装更新。
 - 主窗口按 720、900 和 1180 逻辑点宽度自适应布局，并保持 HiDPI 显示清晰；审计浏览和 PDF 导出保留在主窗口。
 
-DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.0 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
+DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.1 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
 
 ## 使用边界
 
@@ -68,7 +71,7 @@ Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE)，原始发�
 
 ---
 
-# DIT Renamer 1.2.0
+# DIT Renamer 1.2.1
 
 DIT Renamer is a background-first native macOS utility that helps DITs identify camera cards, confirm volume names, and keep a record of every rename before offload begins. It changes the macOS volume name only; folders and clips on the card remain untouched.
 
@@ -79,7 +82,7 @@ DIT Renamer is a background-first native macOS utility that helps DITs identify 
 - macOS 14 Sonoma or later. macOS 13 and earlier are not supported.
 - Native support for Apple Silicon and Intel Macs; Rosetta is not required.
 - No Swift, Python, Java, Homebrew, or other runtime installation is required. Sparkle is embedded and volume operations use macOS components.
-- `exiftool` is optional. It can provide a Sony model when readable XML/XMP metadata is absent; scanning, review, rename, and remount continue to work without it.
+- `exiftool` is optional. When camera-native sidecars cannot provide an exact model, it can inspect one representative media file with bounded fields; scanning, review, rename, and remount continue to work without it.
 - Read/write access to camera media is required. Choose **Allow** if macOS asks for access to removable volumes. Notifications are optional.
 
 ## First installation
@@ -106,15 +109,18 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
 - When two same-name cards are mounted together, the app uses the real volume label instead of macOS's collision-suffixed mount-directory name. Cards sharing a Volume UUID remain distinct by BSD node and first/last clip evidence, and rename/remount operations run strictly in sequence.
 - If two mounted cards have the same suggested or manually requested target name—for example, two FX3 cards both resolving to `A001`—automatic and batch renaming pause for both. The DIT must append `_1`, `_2`, and so on to at least one card, or assign another roll manually. Queue delays only allow simultaneous cards to finish scanning; the final safeguard is the all-candidate target-name check immediately before execution.
-- Reads Sony XML/XMP metadata first. Optional exiftool detection can inspect one representative clip when needed and can be disabled in Settings.
+- Reads camera-native sidecars first. Optional exiftool detection can inspect one representative clip when sidecar evidence is insufficient and can be disabled in Settings.
 - Covers Sony FX3 `PRIVATE/M4ROOT/CLIP` + MP4 and FX6 `XDROOT/Clip` + MXF structures. Exact model labels still require XML/XMP or optional exiftool metadata.
+- Parses camera-native sidecars first. ARRI ALE, Sony NonRealTimeMeta XML, and Panasonic P2 XML can expose an exact model when explicit fields agree. Canon XML/XMP, RED RMD, DJI SRT/XMP, Nikon N-RAW, and Blackmagic BRAW sidecars remain at workflow level when evidence is insufficient.
+- Shows the model-evidence source and High/Medium/Low confidence in the main window, menu-bar review queue, and audit interface. NewsML, lens fields, grading sidecars, filenames, and directory signatures cannot impersonate an exact camera model.
 - Records original and new names, UUIDs, BSD node, first and last clips, and operation time.
 - Reads ParaShoot logs without modifying them and exports a Chinese or English PDF to match the app language. `missingFiles: 0` is shown as **Verification passed**; exact path matches can be included as optional high-confidence association details.
-- Provides an HDE capacity reference for detected ARRIRAW media. The result is an estimate, not a promised encoded size.
+- Reads camera model, ARRIRAW format, and reel metadata from ARRI-generated `*_AVID.ale` files first, with bounded MXF-header metadata as a fallback for exact models such as ALEXA 35.
+- Treats a verified paired Codex `_hde` X2XFUSE mount as ARRI/Codex camera media and estimates HDE capacity from the logical ARRIRAW size on the original UDF volume. The result is conservative and does not promise the final encoded size.
 - Checks for updates at launch and only prompts when a newer release is available. Updates are not installed during rename or remount operations.
 - Adapts the main workspace at 720, 900, and 1180 logical-point widths while preserving HiDPI clarity. Audit browsing and PDF export remain in the main window.
 
-DIT Printer is a separate component and is not included in the DIT Renamer 1.2.0 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
+DIT Printer is a separate component and is not included in the DIT Renamer 1.2.1 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
 
 ## Operating limits
 

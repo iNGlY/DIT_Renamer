@@ -1,9 +1,37 @@
 # DIT Renamer 更新日志 / Changelog
 
+## 1.2.1 — 2026-08-16
+
+### 中文
+
+- 新增统一的摄影机 Sidecar 元数据解析层，支持 ARRI ALE、Sony NonRealTimeMeta XML、Panasonic P2 XML、Canon XML/XMP、RED RMD、DJI SRT/XMP、Nikon N-RAW 和 Blackmagic BRAW sidecar。
+- ARRI、Sony 和 Panasonic 在明确且一致的摄影机原生字段存在时可输出具体型号；Canon、RED、DJI、Nikon 与 Blackmagic 在证据不足时只显示厂商或工作流，不根据文件名、目录、镜头、调色参数或新闻文本猜测机型。
+- 主窗口、菜单栏待审核卡片、重命名历史与 Printer 只读审计 v2 接口增加型号证据来源、置信度和有限属性；不保存 Sidecar 绝对路径、机身序列号或存储介质序列号。
+- 修复 Panasonic P2 XML 的 namespace 含 `nonRealTimeMeta` 时被误分为 Sony XML 的问题，并阻止 Canon NewsML/NewsItem/NewsMetadata 中的用户内容冒充摄影机型号。
+- 修复 RED RDC/R3D 卡先被 Nikon 文件名规则捕获、DJI CinemaDNG 被当成照片卡或硬编码为 Ronin 4D，以及 `.NEV`/`.braw` 在没有可靠型号字段时过度推断的问题。
+- 保留 Sony FX3/FX6/A7 系列的可读型号映射，并为 Sidecar 只能确认工作流的 Canon、RED、DJI、Nikon 与 Blackmagic 媒体增加可选的单素材 ExifTool 后备；解析失败只降低型号置信度，不影响卡片显示和手动重命名。
+- 延续缺少 Volume UUID 时仍可进入手动工作区、规范卷名覆盖前确认、UDF/HDE 只读检查、ARRI ALEXA 35/HDE 容量参考、重复目标卷名阻断和严格串行重挂载流程。
+
+### English
+
+- Added one camera-sidecar metadata layer for ARRI ALE, Sony NonRealTimeMeta XML, Panasonic P2 XML, Canon XML/XMP, RED RMD, DJI SRT/XMP, Nikon N-RAW, and Blackmagic BRAW sidecars.
+- ARRI, Sony, and Panasonic can expose an exact model when explicit camera-native fields agree. Canon, RED, DJI, Nikon, and Blackmagic stay at manufacturer or workflow level when evidence is insufficient; filenames, folders, lens data, grading settings, and newsroom text are not treated as model proof.
+- Added model-evidence source, confidence, and bounded attributes to the main window, menu-bar review cards, rename history, and Printer read-only audit v2 interface. Absolute sidecar paths, camera serial numbers, and media serial numbers are not stored.
+- Fixed Panasonic P2 XML being misclassified as Sony when its namespace contains `nonRealTimeMeta`, and blocked Canon NewsML/NewsItem/NewsMetadata user content from impersonating a camera model.
+- Fixed RED RDC/R3D cards being captured by Nikon filename rules, DJI CinemaDNG being treated as a photo card or hardcoded as Ronin 4D, and `.NEV`/`.braw` media being overidentified without reliable model fields.
+- Preserved readable Sony FX3/FX6/Alpha model mapping and added an optional one-file ExifTool fallback for Canon, RED, DJI, Nikon, and Blackmagic workflows whose sidecars cannot prove an exact model. Sidecar failure lowers model confidence but never hides the card or blocks manual rename.
+- Preserved UUID-less manual access, confirmation before overwriting a standard volume name, read-only UDF/HDE inspection, ALEXA 35/HDE estimates, duplicate-target blocking, and strictly sequential remounts.
+
 ## 1.2.0 — 2026-08-13
 
 ### 中文
 
+- 降低 Volume UUID 在卡片发现与手动操作中的优先级：缺少 UUID 的可写外置卡仍会显示并允许手动指派卷名，但自动重命名和批量批准保持关闭。
+- 对缺少 UUID 的手动操作继续复核 BSD 节点、挂载路径和首末素材；如果 UUID 或 Media UUID 可用，仍要求执行前后保持一致。
+- 已有规范摄影机卷名的卡也可进入手动工作区；实际覆盖前，主窗口与菜单栏都会要求二次确认。
+- 只读 UDF 和经过配对确认的 Codex HDE/X2XFUSE 伴生卷可显示素材信息，但不开放 macOS 无法完成的重命名操作。
+- 增加 ARRI ALE 与有限 MXF 头部解析，可从 `Manufacturer`、`Camera_model` 和 `Original_video` 等字段识别 ALEXA 35 等具体型号及 ARRIRAW。
+- 修复 Codex HDE 虚拟 MXF 显示 0 字节时不输出容量参考的问题；检测到配对 `_hde` 卷后，改用原始 UDF 卷的 ARRIRAW 逻辑大小计算保守 HDE 预估。
 - 按 Apple HIG 整理 App 与菜单栏图标，保留 `A247` App 图标，并统一采用经过 macOS 14 可用性验证的 SF Symbols。
 - 增加菜单栏待审核数量、快速批准、手动指派、自动重命名开关和高置信度批量批准。
 - 在侧边栏和“关于”窗口增加检查更新按钮；启动时静默探测新版，发现新版后显示目标版本，点击后展示更新内容并确认安装。
@@ -22,6 +50,12 @@
 
 ### English
 
+- Lowered the priority of Volume UUID for discovery and manual work. Writable external cards without a UUID remain visible and can be assigned manually, while automatic rename and batch approval stay disabled.
+- UUID-less manual operations still revalidate the BSD node, mount path, and first/last media files. When a Volume UUID or Media UUID is available, it must remain unchanged across the operation.
+- Cards that already have a standard camera volume name can enter the manual workspace; both the main window and menu bar require a second confirmation before overwriting it.
+- Read-only UDF volumes and verified Codex HDE/X2XFUSE companion mounts remain available for inspection, but renaming stays disabled where macOS cannot write the volume.
+- Added ARRI ALE and bounded MXF-header parsing to identify exact models such as ALEXA 35 and ARRIRAW through fields including `Manufacturer`, `Camera_model`, and `Original_video`.
+- Fixed missing HDE estimates when Codex virtual MXF files report zero bytes. A verified paired `_hde` mount now estimates from the logical ARRIRAW size on the original UDF volume.
 - Aligned App and menu-bar icons with Apple HIG, retained the `A247` App icon, and standardized interface symbols on SF Symbols verified for macOS 14.
 - Added menu-bar review counts, quick approval, manual assignment, an auto-rename switch, and sequential batch approval for high-confidence cards.
 - Added check-for-updates buttons to the sidebar and About window. Launch checks probe quietly; when a newer release is found, the target version is shown and release notes appear before installation confirmation.

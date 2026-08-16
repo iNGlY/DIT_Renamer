@@ -169,12 +169,12 @@ struct SettingsView: View {
                     sectionHeader(
                         icon: "camera.metering.unknown",
                         title: langManager.text("摄像机型号元数据识别", "Camera Model Metadata Detection"),
-                        subtitle: langManager.text("优先读取 Sony 卡内 XML/XMP；仅在其中没有明确型号时，才对一条代表性视频使用 exiftool 回退识别。仅显示元数据明确给出的 Sony 具体机型，不从文件名推断。", "Checks Sony card XML/XMP first. Only when it has no explicit model does exiftool inspect one representative clip. It shows only an explicit Sony model from metadata, never an inference from filenames.")
+                        subtitle: langManager.text("优先读取摄影机原生 Sidecar；仅在其中没有明确型号时，才对一条代表性素材使用 exiftool 回退识别。只显示元数据明确给出的机型，不从文件名推断。", "Checks camera-native sidecars first. Only when they have no explicit model does exiftool inspect one representative media file. It shows only an explicit model from metadata, never an inference from filenames.")
                     )
 
                     toggleRow(
                         label: langManager.text("启用 exiftool 型号识别", "Enable exiftool model detection"),
-                        detail: langManager.text("关闭后不启动 exiftool；XML/XMP 的只读识别和现有卷名规则不受影响。", "When disabled, exiftool is never launched; read-only XML/XMP recognition and existing volume-name rules are unchanged."),
+                        detail: langManager.text("关闭后不启动 exiftool；Sidecar/XML 的只读识别和现有卷名规则不受影响。", "When disabled, exiftool is never launched; read-only sidecar/XML recognition and existing volume-name rules are unchanged."),
                         binding: $enableExifToolModelDetection,
                         onChange: { monitor.refreshVolumes() }
                     )
@@ -183,7 +183,7 @@ struct SettingsView: View {
                         Image(systemName: MediaScanner.exifToolPath == nil ? "exclamationmark.triangle" : "checkmark.circle")
                             .foregroundColor(MediaScanner.exifToolPath == nil ? .orange : .green)
                         Text(MediaScanner.exifToolPath == nil
-                             ? langManager.text("未安装 exiftool。只有 XML/XMP 无法识别型号时才需要它；请手动执行 brew install exiftool，或从 exiftool.org 安装。", "exiftool is not installed. It is only needed when XML/XMP cannot identify the model. Install it manually with brew install exiftool or from exiftool.org.")
+                             ? langManager.text("未安装 exiftool。只有 Sidecar/XML 无法识别型号时才需要它；请手动执行 brew install exiftool，或从 exiftool.org 安装。", "exiftool is not installed. It is only needed when sidecar/XML metadata cannot identify the model. Install it manually with brew install exiftool or from exiftool.org.")
                              : langManager.text("exiftool 已安装。", "exiftool is available."))
                             .font(.caption)
                             .foregroundColor(.secondary)

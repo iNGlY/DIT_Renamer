@@ -55,6 +55,34 @@ struct RenamerEngineInventoryTests {
             "An invalid MountPoint field must fail closed"
         )
 
+        precondition(
+            RenamerEngine.matchesExpectedIdentity(
+                actualVolumeUUID: nil,
+                expectedVolumeUUID: nil,
+                actualMediaUUID: nil,
+                expectedMediaUUID: nil
+            ),
+            "Missing UUIDs must not block an explicitly requested manual rename"
+        )
+        precondition(
+            RenamerEngine.matchesExpectedIdentity(
+                actualVolumeUUID: "VOLUME-A",
+                expectedVolumeUUID: "VOLUME-A",
+                actualMediaUUID: nil,
+                expectedMediaUUID: nil
+            ),
+            "Matching available identifiers must remain accepted"
+        )
+        precondition(
+            !RenamerEngine.matchesExpectedIdentity(
+                actualVolumeUUID: "VOLUME-B",
+                expectedVolumeUUID: "VOLUME-A",
+                actualMediaUUID: nil,
+                expectedMediaUUID: nil
+            ),
+            "An available but changed UUID must still cancel the operation"
+        )
+
         print("RenamerEngineInventoryTests: PASS")
     }
 }

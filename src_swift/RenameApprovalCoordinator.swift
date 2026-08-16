@@ -30,7 +30,9 @@ final class RenameApprovalCoordinator: ObservableObject {
 
     func refresh(volumes: [MountedVolume]) {
         isScanning = true
-        let eligible = volumes.filter { $0.isRemovable && !$0.isInternal && $0.volumeUUID != nil }
+        let eligible = volumes.filter {
+            $0.isRemovable && !$0.isInternal && $0.canAttemptManualRename
+        }
         mountedNamesByBSDNode = Dictionary(uniqueKeysWithValues: eligible.map {
             ($0.bsdNode, Self.normalizeVolumeName($0.name))
         })
@@ -96,11 +98,9 @@ final class RenameApprovalCoordinator: ObservableObject {
     }
 
     func ingest(volume: MountedVolume, scan: ScanResult, requestedName: String? = nil) -> RenameCandidate? {
-        guard scan.isScanComplete, volume.volumeUUID != nil else { return nil }
+        guard scan.isScanComplete, volume.canAttemptManualRename else { return nil }
         guard !scan.isEmptyCard, !scan.isPhotoOnly, !scan.isUnformattedCard else { return nil }
-        guard !volume.isUniqueCameraName || requestedName != nil else { return nil }
         let candidate = RenameCandidate(volume: volume, scan: scan, requestedName: requestedName)
-        guard candidate.effectiveName != nil || !volume.isUniqueCameraName else { return nil }
         store.upsert(candidate)
         syncFromStore()
         return pendingCandidates.first(where: { $0.hasSameMountedIdentity(as: candidate) })
@@ -305,9 +305,6 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard !MediaOperationCoordinator.shared.isBusy else {
             return finish(candidateID: candidate.id, success: false, message: "当前已有存储卡操作正在执行。", actualName: nil)
         }
-        guard !candidate.volumeUUID.isEmpty else {
-            return finish(candidateID: candidate.id, success: false, message: "未能确认卡片 UUID，已取消重命名。", actualName: nil)
-        }
         if candidate.mediaUUID == nil {
             let currentFingerprint = MediaScanner.mediaFingerprint(volumePath: candidate.mountPath)
             guard currentFingerprint.firstClipName == candidate.firstClipName,
@@ -329,7 +326,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         let result = await RenamerEngine.renameVolumeAsync(
             at: candidate.mountPath,
             bsdNode: candidate.bsdNode,
-            volumeUUID: candidate.volumeUUID,
+            volumeUUID: candidate.volumeUUID.isEmpty ? nil : candidate.volumeUUID,
             mediaUUID: candidate.mediaUUID,
             fileSystem: candidate.fileSystem,
             to: requestedName
@@ -361,10 +358,15 @@ final class RenameApprovalCoordinator: ObservableObject {
             requestedName: requestedName,
             reuseCount: reuseCount,
             duplicateIndex: duplicateIndex,
-            volumeUUID: candidate.volumeUUID,
+            volumeUUID: candidate.volumeUUID.isEmpty ? nil : candidate.volumeUUID,
             mediaUUID: candidate.mediaUUID,
             bsdNode: candidate.bsdNode,
-            mountedPath: candidate.mountPath
+            mountedPath: candidate.mountPath,
+            fileSystem: candidate.fileSystem,
+            isHighConfidence: candidate.isHighConfidence,
+            isPhotoOnly: candidate.isPhotoOnly,
+            isUnconfiguredCamera: candidate.isUnconfiguredCamera,
+            cameraMetadataEvidence: candidate.cameraMetadataEvidence
         )
         guard RenameHistoryStore.shared.add(history) else {
             var failed = candidate

@@ -78,6 +78,7 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     public let isEmptyCard: Bool
     public let isPhotoOnly: Bool
     public let isUnconfiguredCamera: Bool
+    public let cameraMetadataEvidence: CameraMetadataEvidence?
     public var requestedName: String?
     public var state: RenameApprovalState
     public var lastError: String?
@@ -105,6 +106,7 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
         self.isEmptyCard = scan.isEmptyCard
         self.isPhotoOnly = scan.isPhotoOnly
         self.isUnconfiguredCamera = scan.isUnconfiguredCamera
+        self.cameraMetadataEvidence = scan.cameraMetadataEvidence
         self.requestedName = requestedName ?? scan.suggestedName
         self.state = .pending
         self.lastError = nil
@@ -121,8 +123,12 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     }
 
     public var canBeBatchApproved: Bool {
-        state == .pending && isHighConfidence && !isUnformatted && !isEmptyCard &&
+        hasStableVolumeIdentity && state == .pending && isHighConfidence && !isUnformatted && !isEmptyCard &&
             !isPhotoOnly && !isUnconfiguredCamera && effectiveName != nil
+    }
+
+    public var hasStableVolumeIdentity: Bool {
+        !volumeUUID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     public var identityKey: String {

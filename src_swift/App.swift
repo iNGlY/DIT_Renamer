@@ -57,6 +57,7 @@ struct DITRenamerApp: App {
                     selectedVolume: $selectedVolume,
                     isAutoRenameEnabled: $isAutoRenameEnabled,
                     selectedAuditTab: $selectedAuditTab,
+                    onRefresh: runtime.refreshAll,
                     onShowSettings: { showSettingsSheet = true },
                     onShowAbout: { showAboutSheet = true }
                 )

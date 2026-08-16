@@ -7,6 +7,7 @@ struct ResponsiveWorkspaceView: View {
     @Binding var isAutoRenameEnabled: Bool
     @Binding var selectedAuditTab: AuditTab
 
+    let onRefresh: () -> Void
     let onShowSettings: () -> Void
     let onShowAbout: () -> Void
 
@@ -80,6 +81,7 @@ struct ResponsiveWorkspaceView: View {
             monitor: monitor,
             selectedVolume: $selectedVolume,
             isAutoRenameEnabled: $isAutoRenameEnabled,
+            onRefresh: onRefresh,
             onShowAbout: onShowAbout,
             onShowSettings: onShowSettings
         )
@@ -104,6 +106,11 @@ struct ResponsiveWorkspaceView: View {
                 .lineLimit(1)
 
             Spacer()
+
+            Button(action: onRefresh) {
+                Label(langManager.text("刷新", "Refresh"), systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
 
             Button {
                 showAudit = true

@@ -10,6 +10,7 @@ private func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 @main
 struct SonyMediaScannerTests {
     static func main() throws {
+        UserDefaults.standard.set(false, forKey: "enableExifToolModelDetection")
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("dit-renamer-sony-tests-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
@@ -17,6 +18,7 @@ struct SonyMediaScannerTests {
         try verifyConfiguredFX3Card(root: root.appendingPathComponent("fx3-configured"))
         try verifyDefaultFX3Card(root: root.appendingPathComponent("fx3-default"))
         try verifyConfiguredFX6Card(root: root.appendingPathComponent("fx6-configured"))
+        try verifyTakeOnlyXMLDoesNotImpersonateModel(root: root.appendingPathComponent("take-only"))
         print("SonyMediaScannerTests passed")
     }
 
@@ -65,6 +67,20 @@ struct SonyMediaScannerTests {
         require(result.deviceType.contains("FX6"), "Sony XML should identify FX6 family")
         require(result.firstClipName?.hasSuffix(".MXF") == true, "FX6 media should remain MXF")
         require(result.isHighConfidence, "complete FX6 XDROOT structure should be high confidence")
+    }
+
+    private static func verifyTakeOnlyXMLDoesNotImpersonateModel(root: URL) throws {
+        let clipDirectory = root.appendingPathComponent("PRIVATE/M4ROOT/CLIP")
+        try fmCreate(clipDirectory)
+        try Data("placeholder".utf8).write(to: clipDirectory.appendingPathComponent("A001C001_260812EF.MP4"))
+        try Data("""
+        <?xml version="1.0"?><NonRealTimeMeta><Take><ModelName>ILME-FX9</ModelName></Take></NonRealTimeMeta>
+        """.utf8).write(to: clipDirectory.appendingPathComponent("A001C001_260812EFM01.XML"))
+
+        let result = MediaScanner.scan(volumePath: root.path)
+        require(!result.deviceType.contains("FX9"), "Sony Take metadata without Device must not impersonate an exact model")
+        require(result.cameraMetadataEvidence?.exactModel == nil, "Take-only Sony XML must retain workflow evidence only")
+        require(result.cameraMetadataEvidence?.confidence == .low, "Take-only Sony XML must stay low confidence")
     }
 
     private static func fmCreate(_ directory: URL) throws {

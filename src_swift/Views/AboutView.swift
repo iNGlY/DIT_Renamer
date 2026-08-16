@@ -106,10 +106,10 @@ struct AboutView: View {
                 )
             )
             featureRow(
-                title: langManager.text("Sony 型号元数据识别", "Sony Model Metadata Detection"),
+                title: langManager.text("摄影机型号元数据识别", "Camera Model Metadata Detection"),
                 desc: langManager.text(
-                    "优先读取 Sony 卡内 XML/XMP 元数据；没有明确型号时，可选择使用 exiftool 检查一条代表性素材。exiftool 可在设置中禁用。",
-                    "Reads Sony XML/XMP metadata first. When no explicit model is available, optional exiftool detection can inspect one representative clip and may be disabled in Settings."
+                    "优先读取摄影机原生 Sidecar/XML 元数据；没有明确型号时，可选择使用 exiftool 检查一条代表性素材。exiftool 可在设置中禁用。",
+                    "Reads camera-native sidecar/XML metadata first. When no explicit model is available, optional exiftool detection can inspect one representative clip and may be disabled in Settings."
                 )
             )
             featureRow(
@@ -136,8 +136,8 @@ struct AboutView: View {
             featureRow(
                 title: langManager.text("ARRIRAW / HDE 容量参考估算", "ARRIRAW / HDE Reference Estimate"),
                 desc: langManager.text(
-                    "对检测到的 ARRIRAW 内容提供基于固定模型的 HDE 容量参考估算，不调用外部处理工具，也不代表最终编码结果。",
-                    "Provides a model-based HDE storage estimate for detected ARRIRAW media without invoking an external processing tool or guaranteeing final encoded size."
+                    "优先读取 ARRI ALE，其次读取有限 MXF 头部识别具体机型。检测到配对 Codex HDE 卷时，从原始 UDF 卷的 ARRIRAW 逻辑大小提供保守容量估算，不代表最终编码结果。",
+                    "Reads ARRI ALE first and bounded MXF headers second for the exact camera model. When a paired Codex HDE mount is detected, it provides a conservative estimate from the logical ARRIRAW size on the original UDF volume without guaranteeing final encoded size."
                 )
             )
             featureRow(
