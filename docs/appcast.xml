@@ -6,6 +6,41 @@
         <description>DIT Renamer updates</description>
         <language>zh-cn</language>
         <item>
+            <title>1.2.2</title>
+            <pubDate>Sun, 16 Aug 2026 14:52:09 +0800</pubDate>
+            <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
+            <sparkle:version>1202</sparkle:version>
+            <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# DIT Renamer 1.2.2
+
+## 中文
+
+1.2.2 是针对菜单栏卡片列表的紧急热补丁。
+
+- 修复在主界面手动忽略卷后，该卷仍显示在菜单栏“卡片”列表中的问题。
+- 主界面和菜单栏现在共用同一套忽略路径过滤。
+- 菜单栏直接观察忽略状态；从主界面或菜单栏点击“忽略”后，卡片都会立即隐藏。
+- 被忽略卷仍可在主界面的“已忽略”列表中恢复。
+- 摄影机识别、审批队列、自动重命名、强制重挂载、审计、Sidecar/XML 和 ExifTool 功能未改变。
+
+分发说明：Universal App，支持 Apple Silicon 与 Intel Mac，最低 macOS 14。发布包使用 ad-hoc 签名且未进行 Apple notarization，首次启动请遵循 README 的图形界面安装说明。
+
+## English
+
+DIT Renamer 1.2.2 is an urgent hotfix for the menu-bar card list.
+
+- Fixed volumes ignored from the main window remaining visible in the menu-bar Cards list.
+- The main window and menu bar now use the same ignored-path filter.
+- The menu bar observes ignored-volume state directly, so a card disappears immediately when ignored from either surface.
+- Ignored volumes remain recoverable from the main window's Ignored list.
+- Camera detection, approval queues, automatic rename, forced remount, audit, sidecar/XML, and ExifTool behavior are unchanged.
+
+Distribution note: Universal App for Apple Silicon and Intel Macs; macOS 14 or later is required. The package is ad-hoc signed and not Apple-notarized. Follow the GUI-only installation steps in the README for first launch.
+]]></description>
+            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.2.2/dit_renamer_Release_1.2.2-adhoc-unnotarized.zip" length="3934272" type="application/octet-stream" sparkle:edSignature="zXh+3fKMldtFvYoTFDfr37hpCQjlvVwRM/eKJtcNH3Z0NJbUkzO4R8limhwdrgTM0UjWZZOMdx7HsCyDu4kYBg=="/>
+        </item>
+        <item>
             <title>1.2.1</title>
             <pubDate>Sun, 16 Aug 2026 13:15:05 +0800</pubDate>
             <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
@@ -146,15 +181,6 @@ Distribution notes:
 - Release validation used two cloned exFAT images to simulate same-name, same-UUID cards on separate reader nodes and exercised the real `diskutil` rename, force-unmount, remount, and final verification path. A disposable-card check with the actual readers and Silverstack remains recommended.
 ]]></description>
             <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.2.0/dit_renamer_Release_1.2.0-adhoc-unnotarized.zip" length="3680503" type="application/octet-stream" sparkle:edSignature="e6mzRilghBnqJIEYTADuYT0437CvUwpcwXRUWfKc1EjCb2JpPqLonAkGfPTa7CQlAnkC3viXxFJfadc/tLRaCQ=="/>
-        </item>
-        <item>
-            <title>1.1.1</title>
-            <pubDate>Mon, 10 Aug 2026 03:02:45 +0800</pubDate>
-            <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
-            <sparkle:version>1110</sparkle:version>
-            <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.1.1/dit_renamer_Release_1.1.1-adhoc-unnotarized.zip" length="4142051" type="application/octet-stream" sparkle:edSignature="e4CZTH2fIdVgb556Qsj5RaeDGVu6HBp2T0eVNCGAUDiV8qyuDV3tGQzWrHp7Yks+2AqTUyFAWX9bIlCto7L3BQ=="/>
         </item>
     </channel>
 </rss>
