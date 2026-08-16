@@ -8,6 +8,7 @@ struct RenameMenuBarView: View {
     @ObservedObject var attentionCenter: OperatorAttentionCenter
     @ObservedObject var langManager = LanguageManager.shared
     @ObservedObject private var updateController = UpdateController.shared
+    @ObservedObject private var ignoredStore = IgnoredVolumeStore.shared
 
     let onShowSettings: () -> Void
     let onShowAbout: () -> Void
@@ -185,14 +186,13 @@ struct RenameMenuBarView: View {
 
     private var cardsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if runtime.volumeMonitor.volumes.isEmpty {
-                emptyMessage(icon: "externaldrive.badge.minus", text: langManager.text("未检测到可处理的存储卡", "No eligible camera cards detected"))
+            if menuBarVolumes.isEmpty {
+                emptyMessage(icon: "externaldrive.badge.minus", text: langManager.text("当前没有未忽略的存储卡", "No non-ignored camera cards detected"))
             } else {
-                ForEach(runtime.volumeMonitor.volumes) { volume in
-                    let ignored = runtime.ignoredVolumes.isIgnored(volume)
+                ForEach(menuBarVolumes) { volume in
                     HStack(spacing: 8) {
-                        Image(systemName: ignored ? "eye.slash" : (volume.isGenericName ? "sdcard" : "sdcard.fill"))
-                            .foregroundColor(ignored ? .secondary : .blue)
+                        Image(systemName: volume.isGenericName ? "sdcard" : "sdcard.fill")
+                            .foregroundColor(.blue)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(volume.name).fontWeight(.semibold).lineLimit(1)
                             Text("/dev/\(volume.bsdNode) · \(volume.fileSystem) · \(volume.usedGBFormatted)")
@@ -206,8 +206,8 @@ struct RenameMenuBarView: View {
                             }
                         }
                         Spacer()
-                        Button(ignored ? langManager.text("恢复", "Restore") : langManager.text("忽略", "Ignore")) {
-                            runtime.ignoredVolumes.setIgnored(!ignored, volume: volume)
+                        Button(langManager.text("忽略", "Ignore")) {
+                            ignoredStore.setIgnored(true, volume: volume)
                         }
                         .buttonStyle(.borderless)
                     }
@@ -217,6 +217,13 @@ struct RenameMenuBarView: View {
                 }
             }
         }
+    }
+
+    private var menuBarVolumes: [MountedVolume] {
+        MenuBarVolumeFilter.visibleVolumes(
+            runtime.volumeMonitor.volumes,
+            ignoredPaths: ignoredStore.paths
+        )
     }
 
     private var reviewSection: some View {

@@ -1,4 +1,4 @@
-# DIT Renamer 1.2.1
+# DIT Renamer 1.2.2
 
 DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝开始前识别摄影机卡、确认卷名，并为每次重命名留下记录。它只修改 macOS 显示的卷名，不改卡内目录或素材文件。
 
@@ -32,7 +32,8 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 允许人工调整机位和卷号、用 `_1`、`_2` 处理重复机位冲突，并选择是否保留检测到的 suffix。卡片复用次数为默认关闭的可选审计/标签字段，不参与实际卷名。
 - 对 FAT、MS-DOS 和 exFAT 卷名执行 11 字符上限，不会静默截断输入。
 - 在菜单栏快速查看待人工审核的卡片，批准建议卷名，手动指派机位/卷号/重复机位编号/素材后缀，并可选择记录仅供审计和标签使用的卡片复用次数。
-- 菜单栏可查看和忽略已挂载卡片、恢复忽略项、重新扫描、切换自动重命名、调整过滤规则、检查更新及打开设置。
+- 菜单栏可查看和忽略已挂载卡片、重新扫描、切换自动重命名、调整过滤规则、检查更新及打开设置。
+- 在主界面或菜单栏手动忽略卷后，该卷会立即从菜单栏卡片列表隐藏；恢复操作统一在主界面的“已忽略”列表完成。
 - 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
 - 两张同名卡同时挂载时，使用真实卷标而不是 macOS 自动添加编号的挂载目录名；即使 Volume UUID 相同，也按 BSD 节点与首末素材分别处理，并严格串行执行重命名与重挂载。
 - 两张已挂载卡若建议或手动目标卷名相同（例如两台 FX3 都为 `A001`），自动和批量重命名会同时暂停；DIT 必须先给至少一张加入 `_1`、`_2` 等冲突编号，或手动改为其他卷号。队列延迟只用于等待同时插入的卡完成扫描，最终仍以执行前的全体目标名复核为准。
@@ -47,7 +48,7 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 启动时检查更新；只有发现新版本才显示提示，重命名或重挂载期间不会安装更新。
 - 主窗口按 720、900 和 1180 逻辑点宽度自适应布局，并保持 HiDPI 显示清晰；审计浏览和 PDF 导出保留在主窗口。
 
-DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.1 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
+DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.2 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
 
 ## 使用边界
 
@@ -71,7 +72,7 @@ Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE)，原始发�
 
 ---
 
-# DIT Renamer 1.2.1
+# DIT Renamer 1.2.2
 
 DIT Renamer is a background-first native macOS utility that helps DITs identify camera cards, confirm volume names, and keep a record of every rename before offload begins. It changes the macOS volume name only; folders and clips on the card remain untouched.
 
@@ -105,7 +106,8 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Lets the operator adjust camera ID and roll, resolve duplicate camera IDs with `_1`, `_2`, and so on, and choose whether to keep a detected suffix. Card reuse count is an optional audit/label field that is off by default and never changes the actual volume name.
 - Enforces the 11-character FAT, MS-DOS, and exFAT volume-name limit without silently shortening input.
 - Adds a menu-bar review panel for approving suggested names, assigning camera ID/roll/duplicate index/suffix values, optionally recording reuse metadata for audits and labels, and sequentially approving multiple high-confidence cards.
-- The menu bar also exposes mounted-card actions, ignore/restore controls, rescanning, auto-rename, filtering rules, updates, and settings.
+- The menu bar also exposes mounted-card actions, ignore controls, rescanning, auto-rename, filtering rules, updates, and settings.
+- A volume ignored from either the main window or menu bar now disappears from the menu-bar card list immediately. Restore ignored volumes from the main window's Ignored list.
 - Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
 - When two same-name cards are mounted together, the app uses the real volume label instead of macOS's collision-suffixed mount-directory name. Cards sharing a Volume UUID remain distinct by BSD node and first/last clip evidence, and rename/remount operations run strictly in sequence.
 - If two mounted cards have the same suggested or manually requested target name—for example, two FX3 cards both resolving to `A001`—automatic and batch renaming pause for both. The DIT must append `_1`, `_2`, and so on to at least one card, or assign another roll manually. Queue delays only allow simultaneous cards to finish scanning; the final safeguard is the all-candidate target-name check immediately before execution.
@@ -120,7 +122,7 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Checks for updates at launch and only prompts when a newer release is available. Updates are not installed during rename or remount operations.
 - Adapts the main workspace at 720, 900, and 1180 logical-point widths while preserving HiDPI clarity. Audit browsing and PDF export remain in the main window.
 
-DIT Printer is a separate component and is not included in the DIT Renamer 1.2.1 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
+DIT Printer is a separate component and is not included in the DIT Renamer 1.2.2 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
 
 ## Operating limits
 

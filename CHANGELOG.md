@@ -1,5 +1,19 @@
 # DIT Renamer 更新日志 / Changelog
 
+## 1.2.2 — 2026-08-16
+
+### 中文
+
+- 修复主界面手动忽略的卷仍显示在菜单栏“卡片”列表中的问题。
+- 菜单栏现在直接观察共享的忽略状态，并与主界面使用同一套路径过滤；从任一入口点击“忽略”后，卡片都会立即隐藏。
+- 被忽略卷的恢复入口继续保留在主界面的“已忽略”列表，菜单栏不再显示已忽略卷或“恢复”按钮。
+
+### English
+
+- Fixed manually ignored volumes from the main window still appearing in the menu-bar Cards list.
+- The menu bar now observes the shared ignored-volume state directly and uses the same path filter as the main workspace, so cards disappear immediately when ignored from either surface.
+- Ignored-volume restoration remains in the main window's Ignored list; ignored cards and Restore buttons are no longer shown in the menu bar.
+
 ## 1.2.1 — 2026-08-16
 
 ### 中文
