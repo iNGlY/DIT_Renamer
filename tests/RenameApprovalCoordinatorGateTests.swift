@@ -34,6 +34,7 @@ enum RenamerEngine {
 @MainActor
 final class RenameHistoryStore {
     static let shared = RenameHistoryStore()
+    let items: [RenameHistoryItem] = []
     func add(_ item: RenameHistoryItem) -> Bool {
         fatalError("Audit history must not change while scanning")
     }

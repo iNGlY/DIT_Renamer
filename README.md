@@ -1,4 +1,4 @@
-# DIT Renamer 1.3.0
+# DIT Renamer 1.3.1
 
 DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝开始前识别摄影机卡、确认卷名，并为每次重命名留下记录。它只修改 macOS 显示的卷名，不改卡内目录或素材文件。
 
@@ -41,6 +41,7 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 两张可自动处理的卡若得到相同建议卷名（例如两台 FX3 都为 `A001`），系统会按队列顺序预留 `A001`、`A001_1`、`A001_2`，再逐张执行重命名与重挂载。手动目标名冲突仍会要求操作员确认，所有名称继续受 FAT/exFAT 11 字符上限和执行前全体复核约束。
 - 优先从摄影机原生 Sidecar 读取具体机型；Sidecar 证据不足时，可选用 exiftool 检查一条代表性素材，也可在设置中完全关闭。
 - 覆盖 Sony FX3 的 `PRIVATE/M4ROOT/CLIP` + MP4 和 FX6 的 `XDROOT/Clip` + MXF 结构；具体型号仍以 XML/XMP 或可选 exiftool 元数据为准。
+- 识别 FX3 机内 `Title + Date` 文件名，例如 `B23_FX3B_20260827_0002.mp4`。`B23_FX3B` 作为完整自定义 Title，`FX3B` 只提供 B 机位线索，四位文件号不会冒充 Reel。首次由操作员指定起始卷号；之后同一 Title 可从成功审计历史自动递增，多个同时插入的同 Title 卡会预留连续卷号。
 - 优先解析摄影机原生 Sidecar：ARRI ALE、Sony NonRealTimeMeta XML 和 Panasonic P2 XML 可在字段明确且一致时显示具体机型；Canon XML/XMP、RED RMD、DJI SRT/XMP、Nikon N-RAW 与 Blackmagic BRAW sidecar 在证据不足时保守显示厂商工作流。
 - 主窗口、菜单栏待办和审计接口会记录型号证据来源与高/中/低置信度。NewsML、镜头字段、调色 sidecar、文件名或目录签名不会被冒充为具体摄影机型号。
 - 保存原卷名、新卷名、UUID、BSD 节点、首末素材和操作时间。
@@ -50,7 +51,7 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 启动时检查更新；只有发现新版本才显示提示，重命名或重挂载期间不会安装更新。
 - 主窗口按 720、900 和 1180 逻辑点宽度自适应布局，并保持 HiDPI 显示清晰；审计浏览和 PDF 导出保留在主窗口。
 
-DIT Printer 是独立组件，不包含在 DIT Renamer 1.3.0 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
+DIT Printer 是独立组件，不包含在 DIT Renamer 1.3.1 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
 
 ## 使用边界
 
@@ -74,7 +75,7 @@ Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE)，原始发�
 
 ---
 
-# DIT Renamer 1.3.0
+# DIT Renamer 1.3.1
 
 DIT Renamer is a background-first native macOS utility that helps DITs identify camera cards, confirm volume names, and keep a record of every rename before offload begins. It changes the macOS volume name only; folders and clips on the card remain untouched.
 
@@ -117,6 +118,7 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - If two auto-eligible cards have the same suggested name—for example, two FX3 cards both resolving to `A001`—the app reserves `A001`, `A001_1`, `A001_2`, and so on in queue order before processing them sequentially. Manual target conflicts still require operator confirmation, and every generated name remains subject to the FAT/exFAT 11-character limit and a final all-candidate check.
 - Reads camera-native sidecars first. Optional exiftool detection can inspect one representative clip when sidecar evidence is insufficient and can be disabled in Settings.
 - Covers Sony FX3 `PRIVATE/M4ROOT/CLIP` + MP4 and FX6 `XDROOT/Clip` + MXF structures. Exact model labels still require XML/XMP or optional exiftool metadata.
+- Recognizes in-camera FX3 `Title + Date` names such as `B23_FX3B_20260827_0002.mp4`. `B23_FX3B` remains one custom Title, `FX3B` supplies only the camera-B hint, and the four-digit movie counter is never treated as a reel. The operator sets the first roll; later cards with the same Title increment from successful audit history, with consecutive rolls reserved for simultaneous cards.
 - Parses camera-native sidecars first. ARRI ALE, Sony NonRealTimeMeta XML, and Panasonic P2 XML can expose an exact model when explicit fields agree. Canon XML/XMP, RED RMD, DJI SRT/XMP, Nikon N-RAW, and Blackmagic BRAW sidecars remain at workflow level when evidence is insufficient.
 - Shows the model-evidence source and High/Medium/Low confidence in the main window, menu-bar review queue, and audit interface. NewsML, lens fields, grading sidecars, filenames, and directory signatures cannot impersonate an exact camera model.
 - Records original and new names, UUIDs, BSD node, first and last clips, and operation time.
@@ -126,7 +128,7 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Checks for updates at launch and only prompts when a newer release is available. Updates are not installed during rename or remount operations.
 - Adapts the main workspace at 720, 900, and 1180 logical-point widths while preserving HiDPI clarity. Audit browsing and PDF export remain in the main window.
 
-DIT Printer is a separate component and is not included in the DIT Renamer 1.3.0 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
+DIT Printer is a separate component and is not included in the DIT Renamer 1.3.1 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
 
 ## Operating limits
 

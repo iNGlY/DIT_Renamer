@@ -593,13 +593,17 @@ struct MainDetailView: View {
         let registeredScanID = approvalCoordinator.beginExternalScan()
         externalScanID = registeredScanID
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = MediaScanner.scan(volumePath: selectedVolume.path)
+            let scannedResult = MediaScanner.scan(volumePath: selectedVolume.path)
             DispatchQueue.main.async {
                 guard self.volume?.id == volumeID, self.scanVolumeID == volumeID else {
                     self.approvalCoordinator.endExternalScan(registeredScanID)
                     if self.externalScanID == registeredScanID { self.externalScanID = nil }
                     return
                 }
+                let result = self.approvalCoordinator.resolveSonyTitleSequence(
+                    for: scannedResult,
+                    volume: selectedVolume
+                )
                 self.scanResult = result
                 if let letter = result.cameraLetter { self.selectedLetter = letter }
                 if let roll = result.rollNumber { self.rollInput = roll }

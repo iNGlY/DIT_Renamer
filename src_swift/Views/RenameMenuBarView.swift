@@ -493,7 +493,8 @@ struct RenameMenuBarView: View {
 
     private func prepareAssignment(_ candidate: RenameCandidate) {
         selectedCandidateID = candidate.id
-        let parsed = candidate.effectiveName ?? "A001"
+        let titleDateIdentity = candidate.firstClipName.flatMap(SonyTitleDateNaming.parse)
+        let parsed = candidate.effectiveName ?? "\(titleDateIdentity?.cameraLetter ?? "A")001"
         cameraLetter = String(parsed.prefix(1)).range(of: "^[A-Z]$", options: .regularExpression) != nil
             ? String(parsed.prefix(1)) : "A"
         let rest = String(parsed.dropFirst())

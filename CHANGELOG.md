@@ -1,5 +1,25 @@
 # DIT Renamer 更新日志 / Changelog
 
+## 1.3.1 — 2026-08-28
+
+### 中文
+
+- 增加 Sony FX3 `Title + Date` 文件名兼容，可识别 `B23_FX3A_20260827_0001.MP4`、`B23_FX3B_20260827_0002.mp4` 等自定义项目/机位标题。
+- 只有 `M4ROOT` 结构和 Sony `NonRealTimeMeta` XML 明确确认 `ILME-FX3` 时才启用该规则；文件名中的 `FX3A/FX3B` 不用于判断机型。
+- 四位电影文件号不会被误当作 Reel。首次由操作员指定起始卷号；之后同一完整 Title 从成功重命名历史继续递增。
+- 同时插入多张同一 Title 的卡时预留连续三位卷号，例如 `B005`、`B006`，不使用 `_1` 代替真实的下一卷。
+- 开启代理录制时，仅以 `M4ROOT/CLIP` 主素材建立首末素材指纹；`M4ROOT/SUB` 代理 MP4 不会阻断解析或改变执行前身份复核。
+- 已完成重命名并重挂载的 Title + Date 卡不会被误判为下一张卡；缺少 XML、Title 不一致、无历史或卷号达到 `999` 时继续要求人工确认。
+
+### English
+
+- Added Sony FX3 `Title + Date` filename support for custom project/camera titles such as `B23_FX3A_20260827_0001.MP4` and `B23_FX3B_20260827_0002.mp4`.
+- The rule activates only when an `M4ROOT` structure and Sony `NonRealTimeMeta` XML explicitly confirm `ILME-FX3`; `FX3A/FX3B` text never proves the model.
+- The four-digit movie file counter is not treated as a reel. The operator sets the first roll, and later cards with the same complete Title continue from successful rename history.
+- Simultaneous cards with the same Title reserve consecutive three-digit rolls such as `B005` and `B006` instead of using `_1` as a substitute for the next reel.
+- With proxy recording enabled, first/last media identity comes from primary `M4ROOT/CLIP` files; `M4ROOT/SUB` proxy MP4 files do not block parsing or alter execution-time revalidation.
+- A successfully renamed and remounted Title + Date card is not mistaken for the next card. Missing XML, mixed Titles, absent history, and roll exhaustion at `999` remain manual-review cases.
+
 ## 1.3.0 — 2026-08-28
 
 ### 中文

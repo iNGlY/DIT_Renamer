@@ -116,7 +116,23 @@ final class RenameApprovalCoordinator: ObservableObject {
     func ingest(volume: MountedVolume, scan: ScanResult, requestedName: String? = nil) -> RenameCandidate? {
         guard scan.isScanComplete, volume.canAttemptManualRename else { return nil }
         guard !scan.isEmptyCard, !scan.isPhotoOnly, !scan.isUnformattedCard else { return nil }
-        let candidate = RenameCandidate(volume: volume, scan: scan, requestedName: requestedName)
+        if scan.sonyTitleName != nil,
+           !volume.isGenericName,
+           SonyTitleRemountPolicy.wasAlreadyRenamed(
+                volumeName: volume.name,
+                firstClipName: scan.firstClipName,
+                history: RenameHistoryStore.shared.items
+           ) {
+            syncFromStore()
+            return nil
+        }
+        let resolvedScan = resolveSonyTitleSequence(for: scan, volume: volume)
+        let effectiveRequestedName = resolvedScan.suggestedName ?? requestedName
+        let candidate = RenameCandidate(
+            volume: volume,
+            scan: resolvedScan,
+            requestedName: effectiveRequestedName
+        )
         guard RenameReviewQueuePolicy.needsRename(candidate) else {
             syncFromStore()
             return nil
@@ -125,6 +141,26 @@ final class RenameApprovalCoordinator: ObservableObject {
         reconcileAutomaticReservations()
         syncFromStore()
         return pendingCandidates.first(where: { $0.hasSameMountedIdentity(as: candidate) })
+    }
+
+    func resolveSonyTitleSequence(for scan: ScanResult, volume: MountedVolume) -> ScanResult {
+        guard volume.isGenericName, let titleName = scan.sonyTitleName else { return scan }
+        let normalizedTitle = titleName.precomposedStringWithCanonicalMapping.uppercased()
+        let reservedNames = pendingCandidates.compactMap { candidate -> String? in
+            guard candidate.bsdNode != volume.bsdNode,
+                  candidate.state != .stale,
+                  let firstClipName = candidate.firstClipName,
+                  let identity = SonyTitleDateNaming.parse(firstClipName),
+                  identity.titleName.precomposedStringWithCanonicalMapping.uppercased() == normalizedTitle else {
+                return nil
+            }
+            return candidate.effectiveName
+        }
+        return SonyTitleRollSequence.resolve(
+            scan: scan,
+            successfulAssignments: SonyTitleRollSequence.assignments(from: RenameHistoryStore.shared.items),
+            reservedNames: reservedNames
+        )
     }
 
     func approveSuggestedName(candidateID: UUID) async -> RenameExecutionResult {

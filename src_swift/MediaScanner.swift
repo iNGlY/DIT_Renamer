@@ -29,6 +29,7 @@ public class MediaScanner {
         
         var djiFolders: [String] = []
         var videoClips: [String] = []
+        var sonyPrimaryVideoClips: [String] = []
         var photoClips: [String] = []
         var hasBraw: Bool = false
         var hasNev: Bool = false
@@ -103,6 +104,9 @@ public class MediaScanner {
                 
                 if videoExts.contains(ext) {
                     videoClips.append(name)
+                    if hasSonyStructure, isSonyPrimaryClip(fileURL, volumeURL: url) {
+                        sonyPrimaryVideoClips.append(name)
+                    }
                     videoFileSizes[name] = fSize
                     if metadataCandidateURL == nil || (ext == "mp4" && metadataCandidateURL?.pathExtension.lowercased() != "mp4") {
                         metadataCandidateURL = fileURL
@@ -160,9 +164,13 @@ public class MediaScanner {
         }
 
         videoClips.sort()
+        sonyPrimaryVideoClips.sort()
         photoClips.sort()
-        let firstClip = videoClips.first
-        let lastClip = videoClips.last
+        let identityVideoClips = hasSonyStructure && !sonyPrimaryVideoClips.isEmpty
+            ? sonyPrimaryVideoClips
+            : videoClips
+        let firstClip = identityVideoClips.first
+        let lastClip = identityVideoClips.last
         let arriMetadata = detectARRIMetadata(fromALEs: arriALESidecars)
             ?? detectARRIMetadata(from: metadataCandidateURL)
         if let arriMetadata {
@@ -367,8 +375,52 @@ public class MediaScanner {
                     cameraMetadataEvidence: cameraMetadataEvidence
                 )
             }
+
+            // C. FX3 Title + Date names carry a custom title and file counter,
+            // but no reel. XML must confirm the model before the title's final
+            // FX3A/FX3B token is used as a camera-position hint.
+            let hasConfirmedFX3XML = cameraMetadataEvidence?.manufacturer?.caseInsensitiveCompare("Sony") == .orderedSame
+                && cameraMetadataEvidence?.source == .sonyNonRealTimeMeta
+                && sonyModel?.caseInsensitiveCompare("FX3") == .orderedSame
+            if hasSonyStructure,
+               hasConfirmedFX3XML,
+               let titleIdentity = SonyTitleDateNaming.parse(first) {
+                let matchingTitle = titleIdentity.titleName.uppercased()
+                let matchingCamera = titleIdentity.cameraLetter
+                let hasConsistentTitle = identityVideoClips.allSatisfy { clipName in
+                    guard let identity = SonyTitleDateNaming.parse(clipName) else { return false }
+                    return identity.titleName.uppercased() == matchingTitle
+                        && identity.cameraLetter == matchingCamera
+                }
+                if hasConsistentTitle {
+                    let isUnformatted = dateSpanDays >= 2
+                    return ScanResult(
+                        suggestedName: nil,
+                        cameraLetter: titleIdentity.cameraLetter,
+                        rollNumber: nil,
+                        suffix: nil,
+                        deviceType: sonyModel.map { "Sony \($0)" } ?? "Sony FX3",
+                        clipCount: videoClips.count,
+                        totalFileCount: totalFileCount,
+                        firstClipName: firstClip,
+                        lastClipName: lastClip,
+                        isHighConfidence: false,
+                        isUnconfiguredCamera: false,
+                        isEmptyCard: false,
+                        isPhotoOnly: false,
+                        photoCount: 0,
+                        isUnformattedCard: isUnformatted,
+                        dateSpanDays: dateSpanDays,
+                        earliestDateStr: earliestDateStr,
+                        latestDateStr: latestDateStr,
+                        needsExifToolInstallation: needsExifToolInstallation,
+                        cameraMetadataEvidence: cameraMetadataEvidence,
+                        sonyTitleName: titleIdentity.titleName
+                    )
+                }
+            }
             
-            // C. Observed Sony cinema-style pattern. Metadata is still required for the model.
+            // D. Observed Sony cinema-style pattern. Metadata is still required for the model.
             let sonyFxRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})[CR]\\d{3}_", options: [])
             if let match = sonyFxRegex?.firstMatch(in: first, options: [], range: range) {
                 let camera = String(first[Range(match.range(at: 1), in: first)!])
@@ -390,7 +442,7 @@ public class MediaScanner {
                 )
             }
             
-            // D. Nikon ZR / Z Cinema Pattern (e.g. A001_C018_0731IT.MOV / .R3D / .NEV)
+            // E. Nikon ZR / Z Cinema Pattern (e.g. A001_C018_0731IT.MOV / .R3D / .NEV)
             // Observed shape: camera ID, roll, clip number, date, and a short suffix.
             let nikonZrRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_C\\d{3}_(\\d{4})([A-Z0-9]{2})", options: [])
             if (hasNev || (hasR3d && !hasRdcFolder && !hasRdmFolder)),
@@ -424,7 +476,7 @@ public class MediaScanner {
                 )
             }
             
-            // E. Native RED Digital Cinema (Contains .RDC or .RDM folders)
+            // F. Native RED Digital Cinema (Contains .RDC or .RDM folders)
             if hasRdcFolder || hasRdmFolder {
                 let redRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_", options: [])
                 var camera: String?
@@ -449,7 +501,7 @@ public class MediaScanner {
                 )
             }
             
-            // F. Generic cinema-style pattern. It is not a vendor or model proof.
+            // G. Generic cinema-style pattern. It is not a vendor or model proof.
             let standardCinemaRegex = try? NSRegularExpression(pattern: "^([A-Z])(\\d{3})_", options: [])
             if let match = standardCinemaRegex?.firstMatch(in: first, options: [], range: range) {
                 let camera = String(first[Range(match.range(at: 1), in: first)!])
@@ -688,7 +740,12 @@ public class MediaScanner {
 
     public static func mediaFingerprint(volumePath: String) -> (firstClipName: String?, lastClipName: String?) {
         let url = URL(fileURLWithPath: volumePath)
-        guard let enumerator = FileManager.default.enumerator(
+        let fileManager = FileManager.default
+        let hasSonyStructure = fileManager.fileExists(atPath: url.appendingPathComponent("PRIVATE/M4ROOT").path)
+            || fileManager.fileExists(atPath: url.appendingPathComponent("M4ROOT").path)
+            || fileManager.fileExists(atPath: url.appendingPathComponent("PRIVATE/XDROOT").path)
+            || fileManager.fileExists(atPath: url.appendingPathComponent("XDROOT").path)
+        guard let enumerator = fileManager.enumerator(
             at: url,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
@@ -696,14 +753,35 @@ public class MediaScanner {
 
         let videoExtensions: Set<String> = ["mov", "mp4", "mxf", "ari", "arx", "crm", "r3d", "braw", "nev"]
         var clipNames: [String] = []
+        var sonyPrimaryClipNames: [String] = []
         for case let fileURL as URL in enumerator {
             if Task.isCancelled { return (nil, nil) }
             guard videoExtensions.contains(fileURL.pathExtension.lowercased()) else { continue }
             clipNames.append(fileURL.lastPathComponent)
+            if hasSonyStructure, isSonyPrimaryClip(fileURL, volumeURL: url) {
+                sonyPrimaryClipNames.append(fileURL.lastPathComponent)
+            }
             if clipNames.count > 5000 { return (nil, nil) }
         }
         clipNames.sort()
-        return (clipNames.first, clipNames.last)
+        sonyPrimaryClipNames.sort()
+        let identityNames = hasSonyStructure && !sonyPrimaryClipNames.isEmpty
+            ? sonyPrimaryClipNames
+            : clipNames
+        return (identityNames.first, identityNames.last)
+    }
+
+    private static func isSonyPrimaryClip(_ fileURL: URL, volumeURL: URL) -> Bool {
+        let volumePath = volumeURL.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+        guard filePath.hasPrefix(volumePath) else { return false }
+        var relativePath = String(filePath.dropFirst(volumePath.count))
+        if !relativePath.hasPrefix("/") { relativePath = "/" + relativePath }
+        let normalized = relativePath.uppercased()
+        return normalized.hasPrefix("/PRIVATE/M4ROOT/CLIP/")
+            || normalized.hasPrefix("/M4ROOT/CLIP/")
+            || normalized.hasPrefix("/PRIVATE/XDROOT/CLIP/")
+            || normalized.hasPrefix("/XDROOT/CLIP/")
     }
 
     private static func detectSonyModel(from fileURL: URL?) -> String? {

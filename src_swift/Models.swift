@@ -263,6 +263,7 @@ public struct ScanResult {
     public let isScanComplete: Bool
     public let needsExifToolInstallation: Bool
     public let cameraMetadataEvidence: CameraMetadataEvidence?
+    public let sonyTitleName: String?
     
     public init(suggestedName: String?,
                 cameraLetter: String?,
@@ -285,7 +286,8 @@ public struct ScanResult {
                 hdeResult: HDEResult? = nil,
                 isScanComplete: Bool = true,
                 needsExifToolInstallation: Bool = false,
-                cameraMetadataEvidence: CameraMetadataEvidence? = nil) {
+                cameraMetadataEvidence: CameraMetadataEvidence? = nil,
+                sonyTitleName: String? = nil) {
         self.suggestedName = suggestedName
         self.cameraLetter = cameraLetter
         self.rollNumber = rollNumber
@@ -308,6 +310,7 @@ public struct ScanResult {
         self.isScanComplete = isScanComplete
         self.needsExifToolInstallation = needsExifToolInstallation
         self.cameraMetadataEvidence = cameraMetadataEvidence
+        self.sonyTitleName = sonyTitleName
     }
 }
 

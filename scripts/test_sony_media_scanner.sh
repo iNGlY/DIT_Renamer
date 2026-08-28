@@ -8,6 +8,7 @@ mkdir -p "$TEST_BUILD_DIR"
 
 swiftc -parse-as-library -target arm64-apple-macosx14.0 \
     "$PROJECT_ROOT/src_swift/Models.swift" \
+    "$PROJECT_ROOT/src_swift/Models/SonyTitleDateNaming.swift" \
     "$PROJECT_ROOT/src_swift/CameraSidecarParsers.swift" \
     "$PROJECT_ROOT/src_swift/MediaScanner.swift" \
     "$PROJECT_ROOT/tests/SonyMediaScannerTests.swift" \
