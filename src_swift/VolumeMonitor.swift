@@ -1,19 +1,102 @@
 import Foundation
 import AppKit
 import Combine
+import DiskArbitration
+
+private let volumeMonitorDiskAppearedCallback: DADiskAppearedCallback = { _, context in
+    guard let context else { return }
+    let monitor = Unmanaged<VolumeMonitor>.fromOpaque(context).takeUnretainedValue()
+    DispatchQueue.main.async {
+        monitor.handleDiskAppearance()
+    }
+}
+
+private let volumeMonitorDiskDisappearedCallback: DADiskDisappearedCallback = { disk, context in
+    guard let context else { return }
+    let monitor = Unmanaged<VolumeMonitor>.fromOpaque(context).takeUnretainedValue()
+    let bsdNode = DADiskGetBSDName(disk).map { String(cString: $0) }
+    DispatchQueue.main.async {
+        monitor.handleDiskDisappearance(bsdNode: bsdNode)
+    }
+}
+
+final class VolumeRefreshCoordinator<Value> {
+    struct Request {
+        let generation: Int
+        let shouldStart: Bool
+    }
+
+    private var currentGeneration = 0
+    private var completions: [(Value) -> Void] = []
+    private var isRefreshing = false
+    private var needsTrailingRefresh = false
+
+    func begin(completion: ((Value) -> Void)?) -> Request {
+        currentGeneration += 1
+        if let completion { completions.append(completion) }
+        if isRefreshing {
+            needsTrailingRefresh = true
+            return Request(generation: currentGeneration, shouldStart: false)
+        }
+        isRefreshing = true
+        return Request(generation: currentGeneration, shouldStart: true)
+    }
+
+    @discardableResult
+    func finish(
+        generation: Int,
+        makeValue: () -> Value,
+        apply: (Value) -> Void = { _ in }
+    ) -> Int? {
+        if needsTrailingRefresh {
+            needsTrailingRefresh = false
+            return currentGeneration
+        }
+        guard generation == currentGeneration else {
+            isRefreshing = false
+            return nil
+        }
+        let value = makeValue()
+        apply(value)
+        let waiting = completions
+        completions.removeAll()
+        waiting.forEach { $0(value) }
+        isRefreshing = false
+        return nil
+    }
+}
 
 @MainActor
 public class VolumeMonitor: ObservableObject {
     @Published public var volumes: [MountedVolume] = []
     
     private var cancellables = Set<AnyCancellable>()
-    private var refreshGeneration = 0
+    private let refreshCoordinator = VolumeRefreshCoordinator<[MountedVolume]>()
+    private var shouldResetDJIRetryBudgetForNextRefresh = false
     private var refreshWorkItem: DispatchWorkItem?
     private var mountSessionIDsByPath: [String: String] = [:]
+    private var diskArbitrationSession: DASession?
     
     public init() {
         setupSubscriptions()
+        setupDiskAppearanceMonitoring()
         refreshVolumes()
+    }
+
+    deinit {
+        guard let session = diskArbitrationSession else { return }
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        DAUnregisterCallback(
+            session,
+            unsafeBitCast(volumeMonitorDiskAppearedCallback, to: UnsafeMutableRawPointer.self),
+            context
+        )
+        DAUnregisterCallback(
+            session,
+            unsafeBitCast(volumeMonitorDiskDisappearedCallback, to: UnsafeMutableRawPointer.self),
+            context
+        )
+        DASessionUnscheduleFromRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
     }
     
     private func setupSubscriptions() {
@@ -40,19 +123,65 @@ public class VolumeMonitor: ObservableObject {
                 mountSessionIDsByPath.removeValue(forKey: url.path)
             }
         }
-        scheduleRefresh()
+        scheduleRefresh(resetDJIRetryBudget: true)
     }
 
-    private func scheduleRefresh() {
+    fileprivate func handleDiskAppearance() {
+        scheduleRefresh(resetDJIRetryBudget: true)
+    }
+
+    fileprivate func handleDiskDisappearance(bsdNode: String?) {
+        if let bsdNode {
+            DJIAutoMounter.shared.markDiskDisconnected(bsdNode: bsdNode)
+        }
+        scheduleRefresh(resetDJIRetryBudget: true)
+    }
+
+    private func setupDiskAppearanceMonitoring() {
+        guard let session = DASessionCreate(kCFAllocatorDefault) else { return }
+        diskArbitrationSession = session
+        DARegisterDiskAppearedCallback(
+            session,
+            nil,
+            volumeMonitorDiskAppearedCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
+        DARegisterDiskDisappearedCallback(
+            session,
+            nil,
+            volumeMonitorDiskDisappearedCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
+        DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+    }
+
+    private func scheduleRefresh(
+        after delay: TimeInterval = 0.2,
+        resetDJIRetryBudget: Bool
+    ) {
         refreshWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in self?.refreshVolumes() }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.refreshVolumes(resetDJIRetryBudget: resetDJIRetryBudget)
+        }
         refreshWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
     
-    public func refreshVolumes(completion: (([MountedVolume]) -> Void)? = nil) {
-        refreshGeneration += 1
-        let generation = refreshGeneration
+    public func refreshVolumes(
+        completion: (([MountedVolume]) -> Void)? = nil,
+        resetDJIRetryBudget: Bool = true
+    ) {
+        if resetDJIRetryBudget {
+            shouldResetDJIRetryBudgetForNextRefresh = true
+        }
+        let request = refreshCoordinator.begin(completion: completion)
+        guard request.shouldStart else { return }
+        performRefresh(generation: request.generation)
+    }
+
+    private func performRefresh(generation: Int) {
+        let resetDJIRetryBudget = shouldResetDJIRetryBudgetForNextRefresh
+        shouldResetDJIRetryBudgetForNextRefresh = false
         // Read filter settings from UserDefaults (AppStorage keys)
         let excludeAPFS   = UserDefaults.standard.object(forKey: "excludeAPFS")   as? Bool ?? true
         let excludeNTFS   = UserDefaults.standard.object(forKey: "excludeNTFS")   as? Bool ?? true
@@ -63,10 +192,23 @@ public class VolumeMonitor: ObservableObject {
         let ignoredNames = Set(customIgnores.map(Self.normalizeName))
         
         DispatchQueue.global(qos: .userInitiated).async {
+            if resetDJIRetryBudget {
+                DJIAutoMounter.shared.resetDiscoveryFailures()
+            }
+            let djiAutoMountResult = DJIAutoMounter.shared.mountRecognizedVolumes()
             let fm = FileManager.default
             let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
             let resourceKeys = Set(keys)
-            guard let urls = fm.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else { return }
+            guard let urls = fm.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else {
+                DispatchQueue.main.async {
+                    self.finishRefresh(
+                        generation: generation,
+                        discovered: nil,
+                        djiAutoMountResult: djiAutoMountResult
+                    )
+                }
+                return
+            }
             let mountedPaths = Set(urls.map(\.path))
             
             var discovered: [(MountedVolume, String)] = []
@@ -180,10 +322,27 @@ public class VolumeMonitor: ObservableObject {
             }
             
             DispatchQueue.main.async {
-                guard generation == self.refreshGeneration else { return }
+                self.finishRefresh(
+                    generation: generation,
+                    discovered: discovered,
+                    djiAutoMountResult: djiAutoMountResult
+                )
+            }
+        }
+    }
+
+    private func finishRefresh(
+        generation: Int,
+        discovered: [(MountedVolume, String)]?,
+        djiAutoMountResult: DJIAutoMountResult
+    ) {
+        let nextGeneration = refreshCoordinator.finish(
+            generation: generation,
+            makeValue: {
+                guard let discovered else { return self.volumes }
                 let activePaths = Set(discovered.map(\.1))
                 self.mountSessionIDsByPath = self.mountSessionIDsByPath.filter { activePaths.contains($0.key) }
-                self.volumes = discovered.map { volume, path in
+                return discovered.map { volume, path in
                     let sessionID = self.mountSessionIDsByPath[path] ?? UUID().uuidString
                     self.mountSessionIDsByPath[path] = sessionID
                     return MountedVolume(
@@ -204,8 +363,13 @@ public class VolumeMonitor: ObservableObject {
                         isReadOnly: volume.isReadOnly
                     )
                 }
-                completion?(self.volumes)
-            }
+            },
+            apply: { self.volumes = $0 }
+        )
+        if let nextGeneration {
+            performRefresh(generation: nextGeneration)
+        } else if djiAutoMountResult.shouldRetry {
+            scheduleRefresh(after: 1, resetDJIRetryBudget: false)
         }
     }
 

@@ -43,8 +43,24 @@ final class RenameHistoryStore {
 @MainActor
 struct RenameApprovalCoordinatorGateTests {
     static func main() async {
-        UserDefaults.standard.set(false, forKey: "menuBarAutoRenameEnabled")
+        let defaults = UserDefaults.standard
+        let originalAutomaticRenameSetting = defaults.object(forKey: "menuBarAutoRenameEnabled")
+        defer {
+            if let originalAutomaticRenameSetting {
+                defaults.set(originalAutomaticRenameSetting, forKey: "menuBarAutoRenameEnabled")
+            } else {
+                defaults.removeObject(forKey: "menuBarAutoRenameEnabled")
+            }
+        }
+        defaults.set(false, forKey: "menuBarAutoRenameEnabled")
         let coordinator = RenameApprovalCoordinator.shared
+        for candidate in coordinator.pendingCandidates where [
+            "UUIDLESS-STANDARD-MANUAL-TEST",
+            "ALREADY-RENAMED-SESSION",
+            "AUTO-RESERVATION-SESSION"
+        ].contains(candidate.mountSessionID ?? "") {
+            coordinator.dismiss(candidateID: candidate.id)
+        }
         let scanID = coordinator.beginExternalScan()
         let candidateID = UUID()
 
@@ -120,6 +136,90 @@ struct RenameApprovalCoordinatorGateTests {
         if let standardCandidate {
             coordinator.dismiss(candidateID: standardCandidate.id)
         }
+
+        let alreadyRenamedVolume = MountedVolume(
+            name: "A001",
+            originalName: "A001",
+            path: "/Volumes/A001 Already Renamed Test",
+            bsdNode: "disk98s1",
+            volumeUUID: "ALREADY-RENAMED-UUID",
+            mediaUUID: "ALREADY-RENAMED-MEDIA",
+            mountSessionID: "ALREADY-RENAMED-SESSION",
+            isRemovable: true,
+            isInternal: false,
+            freeBytes: 1,
+            totalBytes: 2,
+            isGenericName: false,
+            fileSystem: "EXFAT",
+            accessLevel: .renameCapable,
+            isReadOnly: false
+        )
+        let alreadyRenamedScan = ScanResult(
+            suggestedName: "A001",
+            cameraLetter: "A",
+            rollNumber: "001",
+            suffix: nil,
+            deviceType: "Sony FX3",
+            clipCount: 2,
+            totalFileCount: 4,
+            firstClipName: "A001C001.MP4",
+            lastClipName: "A001C002.MP4",
+            isHighConfidence: true
+        )
+        let alreadyRenamedCandidate = coordinator.ingest(
+            volume: alreadyRenamedVolume,
+            scan: alreadyRenamedScan
+        )
+        if let alreadyRenamedCandidate {
+            coordinator.dismiss(candidateID: alreadyRenamedCandidate.id)
+        }
+        precondition(
+            alreadyRenamedCandidate == nil,
+            "A card that already has its approved target name must not re-enter the review queue after automatic remount"
+        )
+
+        defaults.set(true, forKey: "menuBarAutoRenameEnabled")
+        let reservationScanID = coordinator.beginExternalScan()
+        let autoVolume = MountedVolume(
+            name: "Untitled",
+            originalName: "Untitled",
+            path: "/Volumes/Auto Reservation Test",
+            bsdNode: "disk97s1",
+            volumeUUID: "AUTO-RESERVATION-UUID",
+            mediaUUID: "AUTO-RESERVATION-MEDIA",
+            mountSessionID: "AUTO-RESERVATION-SESSION",
+            isRemovable: true,
+            isInternal: false,
+            freeBytes: 1,
+            totalBytes: 2,
+            isGenericName: true,
+            fileSystem: "EXFAT",
+            accessLevel: .renameCapable,
+            isReadOnly: false
+        )
+        let automaticReservationScan = ScanResult(
+            suggestedName: "Z997",
+            cameraLetter: "Z",
+            rollNumber: "997",
+            suffix: nil,
+            deviceType: "Sony FX3",
+            clipCount: 2,
+            totalFileCount: 4,
+            firstClipName: "Z997C001.MP4",
+            lastClipName: "Z997C002.MP4",
+            isHighConfidence: true
+        )
+        let autoCandidate = coordinator.ingest(volume: autoVolume, scan: automaticReservationScan)
+        precondition(autoCandidate != nil, "The automatic test card should enter the internal operation queue")
+        precondition(
+            !coordinator.reviewCandidates.contains { $0.id == autoCandidate?.id },
+            "An automatic candidate must be reserved before publication and never flash in the human review queue while sibling scans continue"
+        )
+        if let autoCandidate {
+            coordinator.dismiss(candidateID: autoCandidate.id)
+        }
+        defaults.set(false, forKey: "menuBarAutoRenameEnabled")
+        coordinator.endExternalScan(reservationScanID)
         print("RenameApprovalCoordinatorGateTests: PASS")
     }
 }

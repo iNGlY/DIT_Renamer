@@ -108,6 +108,9 @@ struct RenameMenuBarView: View {
         .onChange(of: coordinator.pendingCount) { _, newValue in
             if newValue > 0 { selectedSection = .review }
         }
+        .onChange(of: autoRenameEnabled) { _, _ in
+            coordinator.automaticRenameSettingDidChange()
+        }
         .confirmationDialog(
             langManager.text("确认批量批准？", "Approve all selected cards?"),
             isPresented: $showBatchConfirmation,
@@ -228,10 +231,10 @@ struct RenameMenuBarView: View {
 
     private var reviewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if coordinator.pendingCandidates.isEmpty {
+            if coordinator.reviewCandidates.isEmpty {
                 emptyMessage(icon: "checkmark.seal", text: langManager.text("当前没有待审核卡片", "No cards need review"))
             } else {
-                ForEach(coordinator.pendingCandidates) { candidate in
+                ForEach(coordinator.reviewCandidates) { candidate in
                     candidateRow(candidate)
                 }
             }
@@ -388,7 +391,7 @@ struct RenameMenuBarView: View {
 
     private var selectedCandidate: RenameCandidate? {
         guard let selectedCandidateID else { return nil }
-        return coordinator.pendingCandidates.first(where: { $0.id == selectedCandidateID })
+        return coordinator.reviewCandidates.first(where: { $0.id == selectedCandidateID })
     }
 
     private func candidateRow(_ candidate: RenameCandidate) -> some View {

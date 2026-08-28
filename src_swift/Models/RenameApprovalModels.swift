@@ -182,6 +182,30 @@ public struct RenameCandidate: Identifiable, Codable, Hashable {
     }
 }
 
+public enum RenameReviewQueuePolicy {
+    public static func needsRename(_ candidate: RenameCandidate) -> Bool {
+        guard let targetName = candidate.normalizedEffectiveName else { return true }
+        return normalized(candidate.originalName) != targetName
+    }
+
+    public static func humanReviewCandidates(
+        from candidates: [RenameCandidate],
+        automaticCandidateIDs: Set<UUID>
+    ) -> [RenameCandidate] {
+        candidates.filter { candidate in
+            (candidate.state == .pending || candidate.state == .failed)
+                && !automaticCandidateIDs.contains(candidate.id)
+                && needsRename(candidate)
+        }
+    }
+
+    private static func normalized(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .precomposedStringWithCanonicalMapping
+            .uppercased()
+    }
+}
+
 @MainActor
 final class AutomaticRenameQueue {
     nonisolated static let defaultInitialStabilizationNanoseconds: UInt64 = 1_000_000_000

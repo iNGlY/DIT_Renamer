@@ -6,6 +6,7 @@ final class RenameApprovalCoordinator: ObservableObject {
     static let shared = RenameApprovalCoordinator()
 
     @Published private(set) var pendingCandidates: [RenameCandidate] = []
+    @Published private(set) var automaticCandidateIDs = Set<UUID>()
     @Published private(set) var lastResult: RenameExecutionResult?
     @Published private(set) var isScanning = false
 
@@ -16,16 +17,26 @@ final class RenameApprovalCoordinator: ObservableObject {
     private var excludedMountPaths = Set<String>()
     private var mountedNamesByBSDNode: [String: String] = [:]
     private var externalScanIDs = Set<UUID>()
+    private var automaticEnqueuedCandidateIDs = Set<UUID>()
     private let automaticRenameQueue = AutomaticRenameQueue()
 
     private init() {
         pendingCandidates = store.candidates
+        reconcileAutomaticReservations()
     }
 
-    var pendingCount: Int { pendingCandidates.filter { $0.state == .pending || $0.state == .failed }.count }
+    var reviewCandidates: [RenameCandidate] {
+        RenameReviewQueuePolicy.humanReviewCandidates(
+            from: pendingCandidates,
+            automaticCandidateIDs: automaticCandidateIDs
+        )
+    }
+    var pendingCount: Int { reviewCandidates.count }
     var batchCandidates: [RenameCandidate] {
         guard RenameOperationPolicy.allowsExecution(via: .batchApproval, isScanning: isScanning) else { return [] }
-        return pendingCandidates.filter { isSafeForAutomaticApproval($0) }
+        return pendingCandidates.filter {
+            !automaticCandidateIDs.contains($0.id) && isSafeForAutomaticApproval($0)
+        }
     }
 
     func refresh(volumes: [MountedVolume]) {
@@ -47,6 +58,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         scannedVolumeKeys = scannedVolumeKeys.filter { key in
             activeVolumeIDs.contains { key.hasPrefix("\($0)|") }
         }
+        reconcileAutomaticReservations()
         syncFromStore()
         for volume in eligible where scanTasks[volume.id] == nil {
             let id = volume.id
@@ -81,6 +93,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         scannedVolumeKeys = scannedVolumeKeys.filter { key in
             !paths.contains { key.contains("|\($0)|") }
         }
+        reconcileAutomaticReservations()
         syncFromStore()
     }
 
@@ -101,7 +114,12 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard scan.isScanComplete, volume.canAttemptManualRename else { return nil }
         guard !scan.isEmptyCard, !scan.isPhotoOnly, !scan.isUnformattedCard else { return nil }
         let candidate = RenameCandidate(volume: volume, scan: scan, requestedName: requestedName)
+        guard RenameReviewQueuePolicy.needsRename(candidate) else {
+            syncFromStore()
+            return nil
+        }
         store.upsert(candidate)
+        reconcileAutomaticReservations()
         syncFromStore()
         return pendingCandidates.first(where: { $0.hasSameMountedIdentity(as: candidate) })
     }
@@ -114,12 +132,15 @@ final class RenameApprovalCoordinator: ObservableObject {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
         }
         guard candidate.state != .stale else {
+            automaticCandidateIDs.remove(candidateID)
             return finish(candidateID: candidateID, success: false, message: "存储卡已卸载或挂载会话已变化，请重新插卡并扫描。", actualName: nil)
         }
         guard let name = candidate.effectiveName else {
+            automaticCandidateIDs.remove(candidateID)
             return finish(candidateID: candidateID, success: false, message: "没有可批准的建议卷名。", actualName: nil)
         }
         guard !hasTargetNameConflict(for: candidate) else {
+            automaticCandidateIDs.remove(candidateID)
             return finish(
                 candidateID: candidateID,
                 success: false,
@@ -138,6 +159,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             return finish(candidateID: candidateID, success: false, message: "待审核记录不存在。", actualName: nil)
         }
         guard candidate.state != .stale else {
+            automaticCandidateIDs.remove(candidateID)
             return finish(candidateID: candidateID, success: false, message: "存储卡已卸载或挂载会话已变化，请重新插卡并扫描。", actualName: nil)
         }
         do {
@@ -147,6 +169,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             store.update(updated)
             syncFromStore()
             guard !hasTargetNameConflict(for: updated) else {
+                automaticCandidateIDs.remove(candidateID)
                 return finish(
                     candidateID: candidateID,
                     success: false,
@@ -161,6 +184,7 @@ final class RenameApprovalCoordinator: ObservableObject {
                 duplicateIndex: request.duplicateIndex
             )
         } catch {
+            automaticCandidateIDs.remove(candidateID)
             return finish(candidateID: candidateID, success: false, message: error.localizedDescription, actualName: nil)
         }
     }
@@ -179,6 +203,8 @@ final class RenameApprovalCoordinator: ObservableObject {
     }
 
     func dismiss(candidateID: UUID) {
+        automaticCandidateIDs.remove(candidateID)
+        automaticEnqueuedCandidateIDs.remove(candidateID)
         store.remove(id: candidateID)
         syncFromStore()
         enqueueAllSafeAutomaticCandidates()
@@ -189,8 +215,14 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard RenameOperationPolicy.allowsExecution(via: .automatic, isScanning: isScanning) else { return false }
         guard let candidate = pendingCandidates.first(where: { $0.id == candidateID }),
               isSafeForAutomaticApproval(candidate) else { return false }
+        automaticCandidateIDs.insert(candidate.id)
+        guard automaticEnqueuedCandidateIDs.insert(candidate.id).inserted else { return true }
         automaticRenameQueue.enqueue(candidate.id) { [weak self] queuedCandidateID in
             guard let self else { return }
+            defer {
+                self.automaticCandidateIDs.remove(queuedCandidateID)
+                self.automaticEnqueuedCandidateIDs.remove(queuedCandidateID)
+            }
             while self.isScanning || MediaOperationCoordinator.shared.isBusy {
                 try? await Task.sleep(nanoseconds: 200_000_000)
             }
@@ -303,12 +335,14 @@ final class RenameApprovalCoordinator: ObservableObject {
         duplicateIndex: Int? = nil
     ) async -> RenameExecutionResult {
         guard !MediaOperationCoordinator.shared.isBusy else {
+            automaticCandidateIDs.remove(candidate.id)
             return finish(candidateID: candidate.id, success: false, message: "当前已有存储卡操作正在执行。", actualName: nil)
         }
         if candidate.mediaUUID == nil {
             let currentFingerprint = MediaScanner.mediaFingerprint(volumePath: candidate.mountPath)
             guard currentFingerprint.firstClipName == candidate.firstClipName,
                   currentFingerprint.lastClipName == candidate.lastClipName else {
+                automaticCandidateIDs.remove(candidate.id)
                 return finish(
                     candidateID: candidate.id,
                     success: false,
@@ -334,6 +368,7 @@ final class RenameApprovalCoordinator: ObservableObject {
         MediaOperationCoordinator.shared.endOperation()
 
         guard result.success, let actualName = result.actualName else {
+            automaticCandidateIDs.remove(candidate.id)
             var failed = candidate
             failed.state = .failed
             failed.lastError = result.message
@@ -369,6 +404,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             cameraMetadataEvidence: candidate.cameraMetadataEvidence
         )
         guard RenameHistoryStore.shared.add(history) else {
+            automaticCandidateIDs.remove(candidate.id)
             var failed = candidate
             failed.state = .failed
             failed.lastError = "卷已重命名，但审计记录保存失败。"
@@ -377,6 +413,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             return finish(candidateID: candidate.id, success: false, message: failed.lastError!, actualName: actualName)
         }
         mountedNamesByBSDNode[candidate.bsdNode] = Self.normalizeVolumeName(actualName)
+        automaticCandidateIDs.remove(candidate.id)
         store.remove(id: candidate.id)
         syncFromStore()
         return finish(candidateID: candidate.id, success: true, message: result.message, actualName: actualName)
@@ -395,11 +432,35 @@ final class RenameApprovalCoordinator: ObservableObject {
     }
 
     private func enqueueAllSafeAutomaticCandidates() {
-        guard !isScanning,
-              UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled") else { return }
-        for candidate in pendingCandidates where isSafeForAutomaticApproval(candidate) {
+        guard !isScanning else { return }
+        guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled") else {
+            automaticCandidateIDs.removeAll()
+            return
+        }
+        reconcileAutomaticReservations()
+        for candidate in pendingCandidates
+        where automaticCandidateIDs.contains(candidate.id) && isSafeForAutomaticApproval(candidate) {
             enqueueAutomaticApproval(candidateID: candidate.id)
         }
+    }
+
+    func automaticRenameSettingDidChange() {
+        reconcileAutomaticReservations()
+        if !isScanning { enqueueAllSafeAutomaticCandidates() }
+    }
+
+    private func reconcileAutomaticReservations() {
+        guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled") else {
+            automaticCandidateIDs.removeAll()
+            return
+        }
+        let candidates = store.candidates
+        automaticCandidateIDs = Set(candidates.compactMap { candidate in
+            candidate.isSafeForAutomaticApproval(
+                among: candidates,
+                occupiedNames: occupiedMountedNames(excludingBSDNode: candidate.bsdNode)
+            ) ? candidate.id : nil
+        })
     }
 
     private func occupiedMountedNames(excludingBSDNode: String?) -> Set<String> {

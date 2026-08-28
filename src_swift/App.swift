@@ -71,6 +71,9 @@ struct DITRenamerApp: App {
                     openWindow(id: "main")
                 }
             }
+            .onChange(of: isAutoRenameEnabled) { _, _ in
+                approvalCoordinator.automaticRenameSettingDidChange()
+            }
             .sheet(isPresented: $showAboutSheet) {
                 AboutView()
             }

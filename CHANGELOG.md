@@ -1,5 +1,19 @@
 # DIT Renamer 更新日志 / Changelog
 
+## Unreleased
+
+### 中文
+
+- 菜单栏“待办”现在只显示真正需要人工处理的卡片：自动队列中的候选和正在执行的手动审批会立即隐藏，执行失败后重新出现；已完成目标卷名的卡在重挂载后不会再次生成待办。
+- 增加 DJI 直连设备自动挂载：发现未挂载且卷名为 `DJI Mavic4`、`Osmo360` 或 `Osmo Action` 的外置卷时，会在二次核对 BSD 节点、卷名和外置身份后执行挂载；兼容整盘卷与分区卷。
+- DJI 自动挂载由磁盘插入事件、应用启动和手动刷新触发；单次连接最多尝试三次，避免失败后形成循环扫描。内置磁盘、磁盘镜像、身份不明或已挂载卷不会执行挂载命令。
+
+### English
+
+- The menu-bar Review queue now contains only cards that need operator action. Candidates assigned to automatic processing and manually approved cards in progress disappear immediately, failures return for review, and a card already carrying its target name does not re-enter the queue after remounting.
+- Added automatic mounting for directly connected DJI devices. An unmounted external volume named `DJI Mavic4`, `Osmo360`, or `Osmo Action` is mounted only after its BSD node, volume label, and external-device identity are revalidated; both whole-disk and partition volumes are supported.
+- DJI auto-mount runs on disk appearance, app launch, and manual refresh, with at most three attempts per connection to avoid a retry loop. Internal disks, disk images, unknown devices, and already mounted volumes never receive a mount command.
+
 ## 1.2.2 — 2026-08-16
 
 ### 中文

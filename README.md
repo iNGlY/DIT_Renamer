@@ -32,7 +32,9 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 允许人工调整机位和卷号、用 `_1`、`_2` 处理重复机位冲突，并选择是否保留检测到的 suffix。卡片复用次数为默认关闭的可选审计/标签字段，不参与实际卷名。
 - 对 FAT、MS-DOS 和 exFAT 卷名执行 11 字符上限，不会静默截断输入。
 - 在菜单栏快速查看待人工审核的卡片，批准建议卷名，手动指派机位/卷号/重复机位编号/素材后缀，并可选择记录仅供审计和标签使用的卡片复用次数。
+- 菜单栏待办只保留需要人工处理的卡片；自动重命名中的卡和主界面已批准、正在执行的卡会立即移出，失败时再返回待办。
 - 菜单栏可查看和忽略已挂载卡片、重新扫描、切换自动重命名、调整过滤规则、检查更新及打开设置。
+- 直连电脑的 `DJI Mavic4`、`Osmo360` 和 `Osmo Action` 卷即使尚未挂载，也会在确认属于外置设备后自动挂载；单次连接最多尝试三次，不会持续循环扫描。
 - 在主界面或菜单栏手动忽略卷后，该卷会立即从菜单栏卡片列表隐藏；恢复操作统一在主界面的“已忽略”列表完成。
 - 重命名前复核挂载路径、BSD 分区节点、Volume UUID 和可用的 Media UUID；成功后强制卸载并重挂载同一分区，刷新 Silverstack 对同名卡的识别。
 - 两张同名卡同时挂载时，使用真实卷标而不是 macOS 自动添加编号的挂载目录名；即使 Volume UUID 相同，也按 BSD 节点与首末素材分别处理，并严格串行执行重命名与重挂载。
@@ -52,7 +54,7 @@ DIT Printer 是独立组件，不包含在 DIT Renamer 1.2.2 App 中。Renamer �
 
 ## 使用边界
 
-- 只显示 macOS 标记为可移除、非内置且已经挂载的卷。
+- 常规摄影机媒体只显示 macOS 标记为可移除、非内置且已经挂载的卷；三个受支持的 DJI 直连卷可先由 App 安全挂载，再进入相同筛选流程。
 - Apple Disk Image Media、网络卷和系统虚拟卷始终排除。
 - 扫描不完整、媒体无法识别、卡为空、只有照片、机位未配置或存在残留素材时，不进入自动重命名队列。
 - `Untitled` 是 Sony FX3/FX6 等设备可能使用的默认卷名，不应直接用于备份盘。本软件处理的是摄影机卡，不负责为名为 `Untitled` 的备份盘提供服务。
@@ -106,7 +108,9 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Lets the operator adjust camera ID and roll, resolve duplicate camera IDs with `_1`, `_2`, and so on, and choose whether to keep a detected suffix. Card reuse count is an optional audit/label field that is off by default and never changes the actual volume name.
 - Enforces the 11-character FAT, MS-DOS, and exFAT volume-name limit without silently shortening input.
 - Adds a menu-bar review panel for approving suggested names, assigning camera ID/roll/duplicate index/suffix values, optionally recording reuse metadata for audits and labels, and sequentially approving multiple high-confidence cards.
+- The menu-bar Review queue contains only cards that need operator action. Automatically processed cards and main-window approvals in progress disappear immediately, while failures return for review.
 - The menu bar also exposes mounted-card actions, ignore controls, rescanning, auto-rename, filtering rules, updates, and settings.
+- Directly connected volumes named `DJI Mavic4`, `Osmo360`, or `Osmo Action` are mounted automatically after external-device validation, with no more than three attempts per connection and no continuous scan loop.
 - A volume ignored from either the main window or menu bar now disappears from the menu-bar card list immediately. Restore ignored volumes from the main window's Ignored list.
 - Rechecks the mount path, BSD partition node, Volume UUID, and Media UUID when available. After a successful rename, it force-unmounts and remounts the same partition so Silverstack sees the new identity cleanly.
 - When two same-name cards are mounted together, the app uses the real volume label instead of macOS's collision-suffixed mount-directory name. Cards sharing a Volume UUID remain distinct by BSD node and first/last clip evidence, and rename/remount operations run strictly in sequence.
@@ -126,7 +130,7 @@ DIT Printer is a separate component and is not included in the DIT Renamer 1.2.2
 
 ## Operating limits
 
-- Only mounted volumes reported by macOS as removable and non-internal are shown.
+- Normal camera media must already be mounted and reported by macOS as removable and non-internal. The three supported DJI direct-connect labels may be safely mounted by the app first, then enter the same filtering workflow.
 - Apple Disk Image Media, network volumes, and system virtual volumes are always excluded.
 - Incomplete scans, unidentified media, empty cards, photo-only cards, unconfigured camera IDs, and cards with residual material do not enter the automatic rename queue.
 - `Untitled` may be the default volume name on cameras including the Sony FX3 and FX6. It should not be used as a backup-volume name; backup drives named `Untitled` are outside this application's scope.

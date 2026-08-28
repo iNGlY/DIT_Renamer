@@ -275,6 +275,31 @@ struct RenameApprovalModelsTests {
             "A writable standardized volume name must request overwrite confirmation without calling the device unknown"
         )
 
+        let alreadyRenamedVolume = MountedVolume(
+            name: "A247", originalName: "A247", path: "/Volumes/A247",
+            bsdNode: "disk11s1", volumeUUID: "ALREADY-RENAMED", mediaUUID: "MEDIA-RENAMED",
+            isRemovable: true, isInternal: false, freeBytes: 1, totalBytes: 2,
+            isGenericName: false, fileSystem: "EXFAT"
+        )
+        let alreadyRenamedCandidate = RenameCandidate(volume: alreadyRenamedVolume, scan: scanA)
+        precondition(
+            !RenameReviewQueuePolicy.needsRename(alreadyRenamedCandidate),
+            "A card whose current volume name already matches the approved target must not re-enter review after remount"
+        )
+
+        var approvingCandidate = candidateA
+        approvingCandidate.state = .approving
+        var failedCandidate = candidateB
+        failedCandidate.state = .failed
+        let visibleReviewCandidates = RenameReviewQueuePolicy.humanReviewCandidates(
+            from: [candidateA, approvingCandidate, failedCandidate, staleClone],
+            automaticCandidateIDs: [candidateA.id]
+        )
+        precondition(
+            visibleReviewCandidates.map(\.id) == [failedCandidate.id],
+            "Automatic, approving, and stale candidates must stay out of the menu-bar review list while failures remain visible"
+        )
+
         print("RenameApprovalModelsTests: PASS")
     }
 }

@@ -68,6 +68,8 @@ DIT Renamer 只支持 macOS。Windows、Linux、iPhone 和 iPad 不能运行本 
 4. 确认卡片不是 APFS、NTFS、UDF、Apple Disk Image Media、网络卷或被手动忽略的卷。可在“规则”或完整设置中查看过滤项。
 5. 确认没有正在运行的 Silverstack 拷贝任务、Finder 文件传输或其它程序占用卡片。
 
+如果直连设备的卷名是 `DJI Mavic4`、`Osmo360` 或 `Osmo Action`，App 会在确认它是外置设备后自动尝试挂载。设备已出现在“磁盘工具”但 Finder 尚未显示时，可打开 DIT Renamer 菜单栏并点“刷新”；每次连接最多自动尝试三次，不会持续循环。仍未挂载时，可在“磁盘工具”中选中对应外置卷并点“装载”，无需使用终端。
+
 ### 7. Sony 机型没有显示得足够具体
 
 DIT Renamer 先读取卡内 XML/XMP。FX3 的常见结构是 `PRIVATE/M4ROOT/CLIP` + MP4，FX6 的常见结构是 `XDROOT/Clip` + MXF。目录结构可以确认 Sony 媒体类型，但具体型号仍需要元数据。
@@ -152,6 +154,8 @@ DIT Renamer is a background-first menu-bar utility. It normally has no persisten
 3. Open the menu-bar panel and rescan.
 4. Check whether APFS, NTFS, UDF, Apple Disk Image Media, network volumes, or manually ignored paths are filtered by Rules or Settings.
 5. Stop any Silverstack copy, Finder transfer, or other task using the card before renaming.
+
+For a directly connected volume named `DJI Mavic4`, `Osmo360`, or `Osmo Action`, the app automatically attempts to mount it after confirming that it is external. If Disk Utility shows the device but Finder does not, open the DIT Renamer menu-bar panel and select **Refresh**. The app makes no more than three attempts per connection and does not scan continuously. If it still remains unmounted, select the external volume in Disk Utility and click **Mount**; Terminal is not required.
 
 ### 7. Sony model is not specific enough
 

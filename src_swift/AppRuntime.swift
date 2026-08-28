@@ -28,10 +28,10 @@ final class AppRuntime: ObservableObject {
             }
             .store(in: &cancellables)
 
-        approvals.$pendingCandidates
+        Publishers.CombineLatest(approvals.$pendingCandidates, approvals.$automaticCandidateIDs)
             .receive(on: RunLoop.main)
-            .sink { [weak attentionCenter] candidates in
-                attentionCenter?.reconcile(candidates: candidates)
+            .sink { [weak approvals, weak attentionCenter] _, _ in
+                attentionCenter?.reconcile(candidates: approvals?.reviewCandidates ?? [])
             }
             .store(in: &cancellables)
 
