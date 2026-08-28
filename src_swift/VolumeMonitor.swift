@@ -191,7 +191,6 @@ public class VolumeMonitor: ObservableObject {
         let excludeNTFS   = UserDefaults.standard.object(forKey: "excludeNTFS")   as? Bool ?? true
         let excludeUDF    = UserDefaults.standard.object(forKey: "excludeUDF")    as? Bool ?? true
         let excludeCodex  = UserDefaults.standard.object(forKey: "excludeHDECodex") as? Bool ?? true
-        let djiAutoMountEnabled = UserDefaults.standard.object(forKey: "menuBarDJIAutoMountEnabled") as? Bool ?? true
         let customIgnores = (try? JSONDecoder().decode([String].self, from: UserDefaults.standard.data(forKey: "customIgnores") ?? Data()))
             ?? ["TIME MACHINE", "MACINTOSH HD"]
         let ignoredNames = Set(customIgnores.map(Self.normalizeName))
@@ -200,9 +199,9 @@ public class VolumeMonitor: ObservableObject {
             if resetDJIRetryBudget {
                 DJIAutoMounter.shared.resetDiscoveryFailures()
             }
-            let djiAutoMountResult = DJIAutoMounter.shared.mountRecognizedVolumes(
-                isEnabled: djiAutoMountEnabled
-            )
+            let djiAutoMountResult = DJIAutoMounter.shared.mountRecognizedVolumes {
+                UserDefaults.standard.object(forKey: "menuBarDJIAutoMountEnabled") as? Bool ?? true
+            }
             let fm = FileManager.default
             let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
             let resourceKeys = Set(keys)

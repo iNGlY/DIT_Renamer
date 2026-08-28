@@ -44,7 +44,11 @@ final class DJIAutoMounter {
     }
 
     func mountRecognizedVolumes(isEnabled: Bool = true) -> DJIAutoMountResult {
-        guard isEnabled else {
+        mountRecognizedVolumes { isEnabled }
+    }
+
+    func mountRecognizedVolumes(isEnabled: () -> Bool) -> DJIAutoMountResult {
+        guard isEnabled() else {
             return DJIAutoMountResult(mountedBSDNodes: [], shouldRetry: false)
         }
         lock.lock()
@@ -67,6 +71,9 @@ final class DJIAutoMounter {
         var mountedNodes: [String] = []
         var shouldRetry = false
         for candidate in candidates {
+            guard isEnabled() else {
+                return DJIAutoMountResult(mountedBSDNodes: mountedNodes, shouldRetry: false)
+            }
             guard !completedBSDNodes.contains(candidate.bsdNode) else { continue }
             let attempts = attemptCounts[candidate.bsdNode, default: 0]
             guard attempts < maximumAttempts else { continue }
@@ -111,6 +118,9 @@ final class DJIAutoMounter {
             }
 
             attemptCounts[candidate.bsdNode] = attempts + 1
+            guard isEnabled() else {
+                return DJIAutoMountResult(mountedBSDNodes: mountedNodes, shouldRetry: false)
+            }
             if commandRunner.mount(bsdNode: candidate.bsdNode) {
                 completedBSDNodes.insert(candidate.bsdNode)
                 mountedNodes.append(candidate.bsdNode)

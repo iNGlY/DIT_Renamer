@@ -230,6 +230,30 @@ struct RenameApprovalModelsTests {
             "The deterministic automatic plan must make both cards safe for sequential execution"
         )
 
+        let elevenCharacterScanA = ScanResult(
+            suggestedName: "A1234567890", cameraLetter: "A", rollNumber: "1234567890", suffix: nil,
+            deviceType: "Camera", clipCount: 2, totalFileCount: 4,
+            firstClipName: "LONG001.MXF", lastClipName: "LONG002.MXF",
+            isHighConfidence: true
+        )
+        let elevenCharacterScanB = ScanResult(
+            suggestedName: "A1234567890", cameraLetter: "A", rollNumber: "1234567890", suffix: nil,
+            deviceType: "Camera", clipCount: 2, totalFileCount: 4,
+            firstClipName: "LONG101.MXF", lastClipName: "LONG102.MXF",
+            isHighConfidence: true
+        )
+        let elevenCharacterCandidateA = RenameCandidate(volume: duplicateUUIDA, scan: elevenCharacterScanA)
+        let elevenCharacterCandidateB = RenameCandidate(volume: duplicateUUIDB, scan: elevenCharacterScanB)
+        let elevenCharacterPlan = AutomaticRenameNamePlanner.plan(
+            candidates: [elevenCharacterCandidateA, elevenCharacterCandidateB],
+            occupiedNamesByBSDNode: [:]
+        )
+        precondition(
+            elevenCharacterPlan[elevenCharacterCandidateA.id] == "A1234567890"
+                && elevenCharacterPlan[elevenCharacterCandidateB.id] == nil,
+            "An 11-character exFAT suggestion must fall back to review instead of being silently truncated to append _1"
+        )
+
         var manuallySeparatedCandidateB = sameTargetCandidateB
         manuallySeparatedCandidateB.requestedName = "B001"
         precondition(

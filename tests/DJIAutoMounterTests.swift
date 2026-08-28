@@ -72,6 +72,14 @@ struct DJIAutoMounterTests {
         require(disabled.mountedBSDNodes.isEmpty && !disabled.shouldRetry, "A disabled DJI option must stay idle")
         require(runner.listCalls == 0, "Disabling DJI auto-mount must avoid even the disk inventory command")
 
+        var enablementChecks = 0
+        let cancelledDuringRefresh = mounter.mountRecognizedVolumes {
+            enablementChecks += 1
+            return enablementChecks < 3
+        }
+        require(cancelledDuringRefresh.mountedBSDNodes.isEmpty, "Turning the option off during refresh must cancel mounting")
+        require(runner.mountCalls.isEmpty, "The option must be checked again immediately before issuing a mount command")
+
         let first = mounter.mountRecognizedVolumes()
         require(first.mountedBSDNodes == ["disk12s1"], "The verified external Mavic 4 volume should mount")
         require(runner.mountCalls == ["disk12s1"], "Unsafe or identity-unknown devices must not receive a mount command")
