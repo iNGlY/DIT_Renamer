@@ -15,6 +15,7 @@ struct RenameMenuBarView: View {
     let openMainWindow: () -> Void
 
     @AppStorage("menuBarAutoRenameEnabled") private var autoRenameEnabled = false
+    @AppStorage("menuBarDJIAutoMountEnabled") private var djiAutoMountEnabled = true
     @AppStorage("excludeAPFS") private var excludeAPFS = true
     @AppStorage("excludeNTFS") private var excludeNTFS = true
     @AppStorage("excludeUDF") private var excludeUDF = true
@@ -110,6 +111,10 @@ struct RenameMenuBarView: View {
         }
         .onChange(of: autoRenameEnabled) { _, _ in
             coordinator.automaticRenameSettingDidChange()
+        }
+        .onChange(of: djiAutoMountEnabled) { _, isEnabled in
+            guard isEnabled else { return }
+            runtime.volumeMonitor.refreshVolumes()
         }
         .confirmationDialog(
             langManager.text("确认批量批准？", "Approve all selected cards?"),
@@ -225,7 +230,8 @@ struct RenameMenuBarView: View {
     private var menuBarVolumes: [MountedVolume] {
         MenuBarVolumeFilter.visibleVolumes(
             runtime.volumeMonitor.volumes,
-            ignoredPaths: ignoredStore.paths
+            ignoredPaths: ignoredStore.paths,
+            ignoredRules: ignoredStore.rules
         )
     }
 
@@ -269,6 +275,7 @@ struct RenameMenuBarView: View {
             ruleToggle(langManager.text("排除 UDF 摄影机卷", "Exclude UDF camera volumes"), binding: $excludeUDF)
             ruleToggle(langManager.text("排除 Codex HDE / X2XFUSE", "Exclude Codex HDE / X2XFUSE"), binding: $excludeCodex)
             ruleToggle(langManager.text("允许 exiftool 型号识别", "Enable exiftool model detection"), binding: $enableExifToolModelDetection)
+            ruleToggle(langManager.text("自动挂载 DJI 直连设备", "Auto-mount direct-connected DJI devices"), binding: $djiAutoMountEnabled)
 
             Divider()
             Label(

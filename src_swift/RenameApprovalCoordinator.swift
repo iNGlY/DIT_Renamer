@@ -15,6 +15,7 @@ final class RenameApprovalCoordinator: ObservableObject {
     private var scanGenerations: [String: UUID] = [:]
     private var scannedVolumeKeys = Set<String>()
     private var excludedMountPaths = Set<String>()
+    private var activeMountSessionIDs = Set<String>()
     private var mountedNamesByBSDNode: [String: String] = [:]
     private var externalScanIDs = Set<UUID>()
     private var automaticEnqueuedCandidateIDs = Set<UUID>()
@@ -28,7 +29,8 @@ final class RenameApprovalCoordinator: ObservableObject {
     var reviewCandidates: [RenameCandidate] {
         RenameReviewQueuePolicy.humanReviewCandidates(
             from: pendingCandidates,
-            automaticCandidateIDs: automaticCandidateIDs
+            automaticCandidateIDs: automaticCandidateIDs,
+            activeMountSessionIDs: activeMountSessionIDs
         )
     }
     var pendingCount: Int { reviewCandidates.count }
@@ -48,6 +50,7 @@ final class RenameApprovalCoordinator: ObservableObject {
             ($0.bsdNode, Self.normalizeVolumeName($0.name))
         })
         let mountedSessionIDs = Set(eligible.compactMap(\.mountSessionID))
+        activeMountSessionIDs = mountedSessionIDs
         let activeVolumeIDs = Set(eligible.map(\.id))
         for id in Array(scanTasks.keys) where !activeVolumeIDs.contains(id) {
             scanTasks[id]?.cancel()
@@ -453,6 +456,17 @@ final class RenameApprovalCoordinator: ObservableObject {
         guard UserDefaults.standard.bool(forKey: "menuBarAutoRenameEnabled") else {
             automaticCandidateIDs.removeAll()
             return
+        }
+        let assignments = AutomaticRenameNamePlanner.plan(
+            candidates: store.candidates,
+            occupiedNamesByBSDNode: mountedNamesByBSDNode
+        )
+        for candidate in store.candidates {
+            guard let assignedName = assignments[candidate.id],
+                  candidate.requestedName != assignedName else { continue }
+            var updated = candidate
+            updated.requestedName = assignedName
+            store.update(updated)
         }
         let candidates = store.candidates
         automaticCandidateIDs = Set(candidates.compactMap { candidate in

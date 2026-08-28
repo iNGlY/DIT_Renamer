@@ -121,6 +121,7 @@ public class VolumeMonitor: ObservableObject {
                 mountSessionIDsByPath[url.path] = UUID().uuidString
             } else {
                 mountSessionIDsByPath.removeValue(forKey: url.path)
+                volumes.removeAll { $0.path == url.path }
             }
         }
         scheduleRefresh(resetDJIRetryBudget: true)
@@ -133,6 +134,9 @@ public class VolumeMonitor: ObservableObject {
     fileprivate func handleDiskDisappearance(bsdNode: String?) {
         if let bsdNode {
             DJIAutoMounter.shared.markDiskDisconnected(bsdNode: bsdNode)
+            volumes.removeAll { volume in
+                volume.bsdNode == bsdNode || volume.bsdNode.hasPrefix("\(bsdNode)s")
+            }
         }
         scheduleRefresh(resetDJIRetryBudget: true)
     }
@@ -187,6 +191,7 @@ public class VolumeMonitor: ObservableObject {
         let excludeNTFS   = UserDefaults.standard.object(forKey: "excludeNTFS")   as? Bool ?? true
         let excludeUDF    = UserDefaults.standard.object(forKey: "excludeUDF")    as? Bool ?? true
         let excludeCodex  = UserDefaults.standard.object(forKey: "excludeHDECodex") as? Bool ?? true
+        let djiAutoMountEnabled = UserDefaults.standard.object(forKey: "menuBarDJIAutoMountEnabled") as? Bool ?? true
         let customIgnores = (try? JSONDecoder().decode([String].self, from: UserDefaults.standard.data(forKey: "customIgnores") ?? Data()))
             ?? ["TIME MACHINE", "MACINTOSH HD"]
         let ignoredNames = Set(customIgnores.map(Self.normalizeName))
@@ -195,7 +200,9 @@ public class VolumeMonitor: ObservableObject {
             if resetDJIRetryBudget {
                 DJIAutoMounter.shared.resetDiscoveryFailures()
             }
-            let djiAutoMountResult = DJIAutoMounter.shared.mountRecognizedVolumes()
+            let djiAutoMountResult = DJIAutoMounter.shared.mountRecognizedVolumes(
+                isEnabled: djiAutoMountEnabled
+            )
             let fm = FileManager.default
             let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
             let resourceKeys = Set(keys)

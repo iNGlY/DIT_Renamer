@@ -205,6 +205,31 @@ struct RenameApprovalModelsTests {
             "The target-name conflict must block both cards symmetrically"
         )
 
+        let automaticNamePlan = AutomaticRenameNamePlanner.plan(
+            candidates: [sameTargetCandidateA, sameTargetCandidateB],
+            occupiedNamesByBSDNode: [:]
+        )
+        precondition(
+            automaticNamePlan[sameTargetCandidateA.id] == "A001",
+            "The first simultaneously inserted A001 card should keep the camera roll name"
+        )
+        precondition(
+            automaticNamePlan[sameTargetCandidateB.id] == "A001_1",
+            "The second simultaneously inserted A001 card must automatically receive _1"
+        )
+        var automaticallySeparatedCandidateA = sameTargetCandidateA
+        automaticallySeparatedCandidateA.requestedName = automaticNamePlan[sameTargetCandidateA.id]
+        var automaticallySeparatedCandidateB = sameTargetCandidateB
+        automaticallySeparatedCandidateB.requestedName = automaticNamePlan[sameTargetCandidateB.id]
+        precondition(
+            automaticallySeparatedCandidateA.isSafeForAutomaticApproval(
+                among: [automaticallySeparatedCandidateA, automaticallySeparatedCandidateB]
+            ) && automaticallySeparatedCandidateB.isSafeForAutomaticApproval(
+                among: [automaticallySeparatedCandidateA, automaticallySeparatedCandidateB]
+            ),
+            "The deterministic automatic plan must make both cards safe for sequential execution"
+        )
+
         var manuallySeparatedCandidateB = sameTargetCandidateB
         manuallySeparatedCandidateB.requestedName = "B001"
         precondition(
@@ -298,6 +323,25 @@ struct RenameApprovalModelsTests {
         precondition(
             visibleReviewCandidates.map(\.id) == [failedCandidate.id],
             "Automatic, approving, and stale candidates must stay out of the menu-bar review list while failures remain visible"
+        )
+
+        let mountedReviewCandidates = RenameReviewQueuePolicy.humanReviewCandidates(
+            from: [replacementCandidate],
+            automaticCandidateIDs: [],
+            activeMountSessionIDs: ["replacement-session"]
+        )
+        precondition(
+            mountedReviewCandidates.map(\.id) == [replacementCandidate.id],
+            "A currently mounted pending card should remain visible in review"
+        )
+        let removedReviewCandidates = RenameReviewQueuePolicy.humanReviewCandidates(
+            from: [replacementCandidate],
+            automaticCandidateIDs: [],
+            activeMountSessionIDs: []
+        )
+        precondition(
+            removedReviewCandidates.isEmpty,
+            "A physically removed card must disappear from the menu-bar review list immediately"
         )
 
         print("RenameApprovalModelsTests: PASS")

@@ -190,13 +190,98 @@ public enum RenameReviewQueuePolicy {
 
     public static func humanReviewCandidates(
         from candidates: [RenameCandidate],
-        automaticCandidateIDs: Set<UUID>
+        automaticCandidateIDs: Set<UUID>,
+        activeMountSessionIDs: Set<String>? = nil
     ) -> [RenameCandidate] {
         candidates.filter { candidate in
             (candidate.state == .pending || candidate.state == .failed)
                 && !automaticCandidateIDs.contains(candidate.id)
                 && needsRename(candidate)
+                && isActivelyMounted(candidate, activeMountSessionIDs: activeMountSessionIDs)
         }
+    }
+
+    private static func isActivelyMounted(
+        _ candidate: RenameCandidate,
+        activeMountSessionIDs: Set<String>?
+    ) -> Bool {
+        guard let activeMountSessionIDs else { return true }
+        guard let mountSessionID = candidate.mountSessionID else { return false }
+        return activeMountSessionIDs.contains(mountSessionID)
+    }
+
+    private static func normalized(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .precomposedStringWithCanonicalMapping
+            .uppercased()
+    }
+}
+
+public enum AutomaticRenameNamePlanner {
+    public static func plan(
+        candidates: [RenameCandidate],
+        occupiedNamesByBSDNode: [String: String]
+    ) -> [UUID: String] {
+        var assignments: [UUID: String] = [:]
+        var reservedNames = Set<String>()
+
+        for candidate in candidates {
+            guard candidate.canBeBatchApproved,
+                  candidate.hasGenericOriginalName,
+                  let preferredName = candidate.effectiveName else { continue }
+            let hasMountedClone = candidates.contains { other in
+                other.id != candidate.id
+                    && other.state != .stale
+                    && candidate.hasSameMediaIdentity(as: other)
+                    && !candidate.hasSameMountedIdentity(as: other)
+            }
+            guard !hasMountedClone else { continue }
+
+            let occupiedByOtherVolumes = Set(occupiedNamesByBSDNode.compactMap { bsdNode, name in
+                bsdNode == candidate.bsdNode ? nil : normalized(name)
+            })
+            let unavailableNames = occupiedByOtherVolumes.union(reservedNames)
+            guard let assignedName = availableName(
+                preferredName,
+                fileSystem: candidate.fileSystem,
+                unavailableNames: unavailableNames
+            ) else { continue }
+            assignments[candidate.id] = assignedName
+            reservedNames.insert(normalized(assignedName))
+        }
+        return assignments
+    }
+
+    private static func availableName(
+        _ preferredName: String,
+        fileSystem: String,
+        unavailableNames: Set<String>
+    ) -> String? {
+        let preferred = normalized(preferredName)
+        guard isValid(preferred, fileSystem: fileSystem) else { return nil }
+        if !unavailableNames.contains(preferred) { return preferred }
+
+        let baseName = preferred.replacingOccurrences(
+            of: #"_[0-9]+$"#,
+            with: "",
+            options: .regularExpression
+        )
+        for index in 1...999 {
+            let candidate = "\(baseName)_\(index)"
+            guard isValid(candidate, fileSystem: fileSystem) else { continue }
+            if !unavailableNames.contains(candidate) { return candidate }
+        }
+        return nil
+    }
+
+    private static func isValid(_ name: String, fileSystem: String) -> Bool {
+        guard !name.isEmpty,
+              name.range(of: "^[A-Z0-9_-]+$", options: .regularExpression) != nil else { return false }
+        let normalizedFileSystem = fileSystem.lowercased()
+        if normalizedFileSystem.contains("fat") || normalizedFileSystem.contains("ms-dos") {
+            return name.count <= 11
+        }
+        return true
     }
 
     private static func normalized(_ name: String) -> String {

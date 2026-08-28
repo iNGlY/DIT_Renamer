@@ -20,11 +20,16 @@ final class AppRuntime: ObservableObject {
         self.ignoredVolumes = ignoredVolumes
         self.attentionCenter = attentionCenter
 
-        Publishers.CombineLatest(volumeMonitor.$volumes, ignoredVolumes.$paths)
+        Publishers.CombineLatest3(volumeMonitor.$volumes, ignoredVolumes.$paths, ignoredVolumes.$rules)
             .receive(on: RunLoop.main)
-            .sink { [weak approvals] volumes, ignoredPaths in
-                approvals?.setExcludedMountPaths(ignoredPaths)
-                approvals?.refresh(volumes: volumes.filter { !ignoredPaths.contains($0.path) })
+            .sink { [weak approvals] volumes, ignoredPaths, ignoredRules in
+                let activeVolumes = MenuBarVolumeFilter.visibleVolumes(
+                    volumes,
+                    ignoredPaths: ignoredPaths,
+                    ignoredRules: ignoredRules
+                )
+                approvals?.setExcludedMountPaths(Set(volumes.filter { !activeVolumes.contains($0) }.map(\.path)))
+                approvals?.refresh(volumes: activeVolumes)
             }
             .store(in: &cancellables)
 
@@ -51,7 +56,7 @@ final class AppRuntime: ObservableObject {
         volumeMonitor.refreshVolumes { [weak self] latestVolumes in
             guard let self else { return }
             self.approvals.rescan(
-                volumes: latestVolumes.filter { !self.ignoredVolumes.paths.contains($0.path) }
+                volumes: latestVolumes.filter { !self.ignoredVolumes.isIgnored($0) }
             )
         }
     }

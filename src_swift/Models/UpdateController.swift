@@ -38,7 +38,7 @@ enum DITRenamerAppInfo {
     static let updateFeedURL = URL(string: "https://ingly.github.io/DIT_Renamer/appcast.xml")!
 
     static var shortVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.2"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.0"
     }
 
     static var buildVersion: String {

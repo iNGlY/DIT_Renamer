@@ -11,11 +11,11 @@ struct SidebarView: View {
     @ObservedObject private var ignoredStore = IgnoredVolumeStore.shared
     
     var activeVolumes: [MountedVolume] {
-        monitor.volumes.filter { !ignoredStore.paths.contains($0.path) }
+        monitor.volumes.filter { !ignoredStore.isIgnored($0) }
     }
     
     var ignoredVolumes: [MountedVolume] {
-        monitor.volumes.filter { ignoredStore.paths.contains($0.path) }
+        monitor.volumes.filter { ignoredStore.isIgnored($0) }
     }
 
     var recommendedVolumes: [MountedVolume] {
@@ -170,7 +170,7 @@ struct SidebarView: View {
             }
         }
         .onChange(of: monitor.volumes) { _, newVolumes in
-            let active = newVolumes.filter { !ignoredStore.paths.contains($0.path) }
+            let active = newVolumes.filter { !ignoredStore.isIgnored($0) }
             let newIDs = Set(active.map(\.id))
             let inserted = active.first { !knownVolumeIDs.contains($0.id) }
             knownVolumeIDs = newIDs

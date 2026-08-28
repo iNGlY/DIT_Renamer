@@ -215,8 +215,52 @@ struct RenameApprovalCoordinatorGateTests {
             !coordinator.reviewCandidates.contains { $0.id == autoCandidate?.id },
             "An automatic candidate must be reserved before publication and never flash in the human review queue while sibling scans continue"
         )
+        let secondAutoVolume = MountedVolume(
+            name: "Untitled 1",
+            originalName: "Untitled",
+            path: "/Volumes/Auto Reservation Test 2",
+            bsdNode: "disk96s1",
+            volumeUUID: "AUTO-RESERVATION-UUID-2",
+            mediaUUID: "AUTO-RESERVATION-MEDIA-2",
+            mountSessionID: "AUTO-RESERVATION-SESSION-2",
+            isRemovable: true,
+            isInternal: false,
+            freeBytes: 1,
+            totalBytes: 2,
+            isGenericName: true,
+            fileSystem: "EXFAT",
+            accessLevel: .renameCapable,
+            isReadOnly: false
+        )
+        let secondAutomaticScan = ScanResult(
+            suggestedName: "Z997",
+            cameraLetter: "Z",
+            rollNumber: "997",
+            suffix: nil,
+            deviceType: "Sony FX3",
+            clipCount: 2,
+            totalFileCount: 4,
+            firstClipName: "Z997C101.MP4",
+            lastClipName: "Z997C102.MP4",
+            isHighConfidence: true
+        )
+        let secondAutoCandidate = coordinator.ingest(volume: secondAutoVolume, scan: secondAutomaticScan)
+        let reservedCandidates = coordinator.pendingCandidates.filter {
+            ["AUTO-RESERVATION-SESSION", "AUTO-RESERVATION-SESSION-2"].contains($0.mountSessionID ?? "")
+        }
+        precondition(
+            reservedCandidates.map(\.effectiveName) == ["Z997", "Z997_1"],
+            "The coordinator must persist deterministic target reservations before automatic execution begins"
+        )
+        precondition(
+            Set(reservedCandidates.map(\.id)).isSubset(of: coordinator.automaticCandidateIDs),
+            "Both uniquely reserved cards must enter the automatic queue instead of falling back to the conflict review"
+        )
         if let autoCandidate {
             coordinator.dismiss(candidateID: autoCandidate.id)
+        }
+        if let secondAutoCandidate {
+            coordinator.dismiss(candidateID: secondAutoCandidate.id)
         }
         defaults.set(false, forKey: "menuBarAutoRenameEnabled")
         coordinator.endExternalScan(reservationScanID)

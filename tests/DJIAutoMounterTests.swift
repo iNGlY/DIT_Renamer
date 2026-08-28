@@ -4,6 +4,7 @@ private final class FakeDJIAutoMountRunner: DJIAutoMountCommandRunning {
     var list: Any?
     var infoByNode: [String: DJIAutoMountDiskInfo]
     var mountResults: [String: Bool]
+    private(set) var listCalls = 0
     private(set) var mountCalls: [String] = []
 
     init(
@@ -16,7 +17,10 @@ private final class FakeDJIAutoMountRunner: DJIAutoMountCommandRunning {
         self.mountResults = mountResults
     }
 
-    func diskListPropertyList() -> Any? { list }
+    func diskListPropertyList() -> Any? {
+        listCalls += 1
+        return list
+    }
     func diskInfo(for bsdNode: String) -> DJIAutoMountDiskInfo? { infoByNode[bsdNode] }
     func mount(bsdNode: String) -> Bool {
         mountCalls.append(bsdNode)
@@ -63,6 +67,10 @@ struct DJIAutoMounterTests {
             mountResults: ["disk12s1": true]
         )
         let mounter = DJIAutoMounter(commandRunner: runner, maximumAttempts: 3)
+
+        let disabled = mounter.mountRecognizedVolumes(isEnabled: false)
+        require(disabled.mountedBSDNodes.isEmpty && !disabled.shouldRetry, "A disabled DJI option must stay idle")
+        require(runner.listCalls == 0, "Disabling DJI auto-mount must avoid even the disk inventory command")
 
         let first = mounter.mountRecognizedVolumes()
         require(first.mountedBSDNodes == ["disk12s1"], "The verified external Mavic 4 volume should mount")

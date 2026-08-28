@@ -43,7 +43,10 @@ final class DJIAutoMounter {
         self.maximumAttempts = max(1, maximumAttempts)
     }
 
-    func mountRecognizedVolumes() -> DJIAutoMountResult {
+    func mountRecognizedVolumes(isEnabled: Bool = true) -> DJIAutoMountResult {
+        guard isEnabled else {
+            return DJIAutoMountResult(mountedBSDNodes: [], shouldRetry: false)
+        }
         lock.lock()
         defer { lock.unlock() }
 
