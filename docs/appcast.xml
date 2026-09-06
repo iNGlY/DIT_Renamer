@@ -6,6 +6,37 @@
         <description>DIT Renamer updates</description>
         <language>zh-cn</language>
         <item>
+            <title>1.3.2</title>
+            <pubDate>Mon, 07 Sep 2026 00:29:15 +0800</pubDate>
+            <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
+            <sparkle:version>1302</sparkle:version>
+            <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# DIT Renamer 1.3.2
+
+## 中文
+
+修复摄影机 SD 卡插入 MacBook 内置读卡器后，软件不显示卡片的问题。
+
+- 正确区分内置读卡器与内部系统磁盘。使用 Secure Digital 协议、可移除且可弹出的 SD 卡不再因 `Internal=true` 被直接过滤；标记为系统内部介质的卷仍会排除。
+- Sony FX6 的 `PRIVATE/XDROOT/Clip` MXF/XML 素材可进入现有扫描流程。识别机型与生成卷名是两件事：自定义素材名未提供可靠机位、卷号时，仍需手动指定。
+- 保留系统卷、磁盘镜像和网络卷过滤，以及现有自动重命名、双卡串行重挂载、菜单栏审批和审计功能。本次不调整扫描上限。
+
+支持 macOS 14 及以上，原生支持 Apple Silicon 和 Intel。无需额外运行库。发布包使用 ad-hoc 签名，未经 Apple 公证；首次安装请按 README 操作。已有用户可通过应用内检查更新安装。
+
+## English
+
+Fixes camera SD cards not appearing when inserted into a MacBook's built-in card reader.
+
+- Distinguishes a built-in reader from an internal system disk. Removable, ejectable cards using the Secure Digital protocol are no longer rejected solely because macOS reports `Internal=true`. Volumes marked as OS-internal media remain excluded.
+- Sony FX6 MXF/XML media under `PRIVATE/XDROOT/Clip` can reach the existing scanner. Model detection does not guarantee a suggested volume name: custom clip names without reliable camera and reel information still require manual assignment.
+- Preserves system-volume, disk-image, and network-volume filtering, automatic renaming, sequential dual-card remounting, menu-bar approval, and audit features. Scan limits are unchanged.
+
+Requires macOS 14 or later; runs natively on Apple Silicon and Intel without additional runtimes. The package is ad-hoc signed and not Apple-notarized. Follow the README for first installation, or use Check for Updates in the app.
+]]></description>
+            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.3.2/dit_renamer_Release_1.3.2-adhoc-unnotarized.zip" length="4089084" type="application/octet-stream" sparkle:edSignature="SuDKWJe+sjHXzH01hpzhoMeScadzb7ytNzVr4LIxJP/OoODaltkFlhUFENu6MoOEjBvLpAGv9dFWFt7edsA3DQ=="/>
+        </item>
+        <item>
             <title>1.3.1</title>
             <pubDate>Fri, 28 Aug 2026 15:45:33 +0800</pubDate>
             <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
@@ -78,41 +109,6 @@ DIT Renamer 1.3.0 promotes the Test-validated background menu-bar workflow to a 
 Distribution note: Universal App with native Apple Silicon and Intel support; macOS 14 or later is required. The package is ad-hoc signed and not Apple-notarized. Follow the GUI-only installation steps in the README for first launch.
 ]]></description>
             <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.3.0/dit_renamer_Release_1.3.0-adhoc-unnotarized.zip" length="4053704" type="application/octet-stream" sparkle:edSignature="us+l9saU6erxCUmZvt09hOh+bAEjApeJsluuXDoPgr2GrPVPFEAxCi0uOpO8pArH+cpgoU6UjcRmcvV9LUasBQ=="/>
-        </item>
-        <item>
-            <title>1.2.2</title>
-            <pubDate>Sun, 16 Aug 2026 14:52:09 +0800</pubDate>
-            <link>https://github.com/iNGlY/DIT_Renamer/releases/latest</link>
-            <sparkle:version>1202</sparkle:version>
-            <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# DIT Renamer 1.2.2
-
-## 中文
-
-1.2.2 是针对菜单栏卡片列表的紧急热补丁。
-
-- 修复在主界面手动忽略卷后，该卷仍显示在菜单栏“卡片”列表中的问题。
-- 主界面和菜单栏现在共用同一套忽略路径过滤。
-- 菜单栏直接观察忽略状态；从主界面或菜单栏点击“忽略”后，卡片都会立即隐藏。
-- 被忽略卷仍可在主界面的“已忽略”列表中恢复。
-- 摄影机识别、审批队列、自动重命名、强制重挂载、审计、Sidecar/XML 和 ExifTool 功能未改变。
-
-分发说明：Universal App，支持 Apple Silicon 与 Intel Mac，最低 macOS 14。发布包使用 ad-hoc 签名且未进行 Apple notarization，首次启动请遵循 README 的图形界面安装说明。
-
-## English
-
-DIT Renamer 1.2.2 is an urgent hotfix for the menu-bar card list.
-
-- Fixed volumes ignored from the main window remaining visible in the menu-bar Cards list.
-- The main window and menu bar now use the same ignored-path filter.
-- The menu bar observes ignored-volume state directly, so a card disappears immediately when ignored from either surface.
-- Ignored volumes remain recoverable from the main window's Ignored list.
-- Camera detection, approval queues, automatic rename, forced remount, audit, sidecar/XML, and ExifTool behavior are unchanged.
-
-Distribution note: Universal App for Apple Silicon and Intel Macs; macOS 14 or later is required. The package is ad-hoc signed and not Apple-notarized. Follow the GUI-only installation steps in the README for first launch.
-]]></description>
-            <enclosure url="https://github.com/iNGlY/DIT_Renamer/releases/download/v1.2.2/dit_renamer_Release_1.2.2-adhoc-unnotarized.zip" length="3934272" type="application/octet-stream" sparkle:edSignature="zXh+3fKMldtFvYoTFDfr37hpCQjlvVwRM/eKJtcNH3Z0NJbUkzO4R8limhwdrgTM0UjWZZOMdx7HsCyDu4kYBg=="/>
         </item>
     </channel>
 </rss>
