@@ -59,6 +59,32 @@ struct VolumeMonitorEligibilityTests {
             "An internal disk must always be rejected"
         )
         require(
+            VolumeMonitor.isEligibleExternalMedia(
+                diskInternal: true,
+                diskRemovable: true,
+                diskExternal: true,
+                diskProtocol: "Secure Digital",
+                diskEjectable: true,
+                diskOSInternalMedia: false,
+                foundationRemovable: true,
+                foundationInternal: true
+            ),
+            "A removable, ejectable SD card in a built-in Mac reader must remain eligible"
+        )
+        require(
+            !VolumeMonitor.isEligibleExternalMedia(
+                diskInternal: true,
+                diskRemovable: true,
+                diskExternal: true,
+                diskProtocol: "Secure Digital",
+                diskEjectable: true,
+                diskOSInternalMedia: true,
+                foundationRemovable: true,
+                foundationInternal: true
+            ),
+            "An OS-internal SD-like volume must remain rejected"
+        )
+        require(
             !VolumeMonitor.isEligibleExternalMedia(
                 diskInternal: nil,
                 diskRemovable: nil,

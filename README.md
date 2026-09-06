@@ -1,4 +1,4 @@
-# DIT Renamer 1.3.1
+# DIT Renamer 1.3.2
 
 DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝开始前识别摄影机卡、确认卷名，并为每次重命名留下记录。它只修改 macOS 显示的卷名，不改卡内目录或素材文件。
 
@@ -51,7 +51,7 @@ DIT Renamer 是一款后台优先的原生 macOS 工具，帮助 DIT 在拷贝�
 - 启动时检查更新；只有发现新版本才显示提示，重命名或重挂载期间不会安装更新。
 - 主窗口按 720、900 和 1180 逻辑点宽度自适应布局，并保持 HiDPI 显示清晰；审计浏览和 PDF 导出保留在主窗口。
 
-DIT Printer 是独立组件，不包含在 DIT Renamer 1.3.1 App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
+DIT Printer 是独立组件，不包含在 DIT Renamer App 中。Renamer 只向 Printer 提供只读审计数据，Printer 不能通过该接口触发重命名、卸载、校验或擦除。
 
 ## 使用边界
 
@@ -75,7 +75,7 @@ Copyright 2026 DIT247。项目采用 [Apache License 2.0](LICENSE)，原始发�
 
 ---
 
-# DIT Renamer 1.3.1
+# DIT Renamer 1.3.2
 
 DIT Renamer is a background-first native macOS utility that helps DITs identify camera cards, confirm volume names, and keep a record of every rename before offload begins. It changes the macOS volume name only; folders and clips on the card remain untouched.
 
@@ -128,7 +128,7 @@ The current package is a universal ad-hoc build for Apple Silicon and Intel Macs
 - Checks for updates at launch and only prompts when a newer release is available. Updates are not installed during rename or remount operations.
 - Adapts the main workspace at 720, 900, and 1180 logical-point widths while preserving HiDPI clarity. Audit browsing and PDF export remain in the main window.
 
-DIT Printer is a separate component and is not included in the DIT Renamer 1.3.1 App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
+DIT Printer is a separate component and is not included in the DIT Renamer App. Renamer exposes read-only audit data to Printer; that interface cannot trigger rename, unmount, verification, or erase operations.
 
 ## Operating limits
 

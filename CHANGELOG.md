@@ -1,5 +1,19 @@
 # DIT Renamer 更新日志 / Changelog
 
+## 1.3.2 — 2026-09-07
+
+### 中文
+
+- 修复 MacBook 内置 SD 读卡器中的摄影机卡因 `Internal=true` 被误过滤、无法显示的问题。
+- 允许可移除、可弹出且未标记为系统内部介质的 Secure Digital 卡；保留系统盘、磁盘镜像及网络卷过滤。
+- 覆盖 FX6 `PRIVATE/XDROOT/Clip` 素材的卷发现入口。自定义文件名缺少可靠机位和卷号时，仍需手动指定；扫描上限不变。
+
+### English
+
+- Fixed camera SD cards in MacBook built-in readers being hidden because macOS reports `Internal=true`.
+- Admits removable, ejectable Secure Digital cards not marked as OS-internal media while preserving system-disk, disk-image, and network-volume exclusions.
+- Restores volume discovery for FX6 `PRIVATE/XDROOT/Clip` media. Custom clip names without reliable camera and reel information still require manual assignment; scan limits are unchanged.
+
 ## 1.3.1 — 2026-08-28
 
 ### 中文

@@ -259,6 +259,9 @@ public class VolumeMonitor: ObservableObject {
                         diskInternal: baseIdentity.isInternal,
                         diskRemovable: baseIdentity.isRemovableMedia,
                         diskExternal: baseIdentity.isExternalDevice,
+                        diskProtocol: baseIdentity.busProtocol,
+                        diskEjectable: baseIdentity.isEjectable,
+                        diskOSInternalMedia: baseIdentity.isOSInternalMedia,
                         foundationRemovable: baseValues?.volumeIsRemovable,
                         foundationInternal: baseValues?.volumeIsInternal
                     ) else { continue }
@@ -273,6 +276,9 @@ public class VolumeMonitor: ObservableObject {
                         diskInternal: identity.isInternal,
                         diskRemovable: identity.isRemovableMedia,
                         diskExternal: identity.isExternalDevice,
+                        diskProtocol: identity.busProtocol,
+                        diskEjectable: identity.isEjectable,
+                        diskOSInternalMedia: identity.isOSInternalMedia,
                         foundationRemovable: resourceValues?.volumeIsRemovable,
                         foundationInternal: resourceValues?.volumeIsInternal
                     ) else { continue }
@@ -389,6 +395,8 @@ public class VolumeMonitor: ObservableObject {
         let isInternal: Bool?
         let isRemovableMedia: Bool?
         let isExternalDevice: Bool?
+        let isEjectable: Bool?
+        let isOSInternalMedia: Bool?
         let isWritable: Bool?
 
         var isAppleDiskImage: Bool {
@@ -405,10 +413,19 @@ public class VolumeMonitor: ObservableObject {
         diskInternal: Bool?,
         diskRemovable: Bool?,
         diskExternal: Bool?,
+        diskProtocol: String? = nil,
+        diskEjectable: Bool? = nil,
+        diskOSInternalMedia: Bool? = nil,
         foundationRemovable: Bool?,
         foundationInternal: Bool?
     ) -> Bool {
-        guard diskInternal != true, foundationInternal != true else { return false }
+        let isBuiltInSDCard = diskProtocol?.caseInsensitiveCompare("Secure Digital") == .orderedSame
+            && diskRemovable == true
+            && diskEjectable == true
+            && diskOSInternalMedia != true
+        if diskInternal == true || foundationInternal == true {
+            return isBuiltInSDCard
+        }
         return diskRemovable == true || diskExternal == true || foundationRemovable == true
     }
 
@@ -472,6 +489,8 @@ public class VolumeMonitor: ObservableObject {
             isInternal: plist["Internal"] as? Bool,
             isRemovableMedia: (plist["RemovableMedia"] as? Bool) ?? (plist["Removable"] as? Bool),
             isExternalDevice: plist["RemovableMediaOrExternalDevice"] as? Bool,
+            isEjectable: plist["Ejectable"] as? Bool,
+            isOSInternalMedia: plist["OSInternalMedia"] as? Bool,
             isWritable: (plist["WritableVolume"] as? Bool) ?? (plist["Writable"] as? Bool)
         )
     }
